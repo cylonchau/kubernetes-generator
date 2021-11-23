@@ -11,6 +11,9 @@ EOF
     exit 1
 }
 
+ROOT=$(cd $(dirname $0); pwd)
+export ROOT
+
 function set_evn(){
     DIR=${DIR:-generate}
     if [ ${#} -eq 1 ]; then
@@ -104,8 +107,8 @@ function openssl_sign() {
 
 function generate_kubernetes_certificates() {
     # If supplied, generate a new etcd CA and associated certs.
-    if [ -n ${ETCD_CERTS_DIR} ]; then
-       export ETCD_CERTS_DIR=${DIR}/etcd
+    if [ !-n $ETCD_CERTS_DIR ]; then
+       export ETCD_CERTS_DIR=${ROOT}/etcd
     fi
 
     if [ -n $FRONT_PROXY_CA_CERT ]; then
@@ -166,7 +169,7 @@ function generate_kubernetes_certificates() {
         
         if [ -d "$ETCD_CERTS_DIR" ]; then
             # echo "Copy etcd client key and certs"
-        cp $ETCD_CERTS_DIR/pki/apiserver-etcd-client.{key,crt} ${master_dir}/pki/
+        cp $ETCD_CERTS_DIR/pki/apiserver-etcd.{key,crt} ${master_dir}/pki/
         fi
 
         # echo "Generating kubeconfig for kube-controller-manager"
@@ -370,12 +373,12 @@ case "$1" in
     "k8s"|"K8S"|"kubernetes"|"KUBERNETES")
         set_evn kubernetes
         generate_kubernetes_certificates
-		;;
+        ;;
     "etcd"|"ETCD")
         set_evn etcd
         generate_etcd_certificates
         ;; 
-	*)
-		usage
-	    ;;
+    *)
+        usage
+        ;;
 esac
