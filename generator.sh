@@ -34,6 +34,9 @@ function set_evn(){
     case "$1" in
 	"k8s"|"kubernetes")
 
+        read -p "Pls Enter Domain Name [myexample.k8s.io]: " BASE_DOMAIN
+        BASE_DOMAIN=${BASE_DOMAIN:-k8s.io}
+
         read -p "Pls Enter Kubernetes Cluster Name [kubernetes]: " CLUSTER_NAME
         echo -n -e "Enter the IP Address in default namespace \n of the Kubernetes API Server[10.96.0.1]: "
         read  APISERVER_CLUSTER_IP
@@ -49,7 +52,7 @@ function set_evn(){
         read -p "Pls Enter Certificate validity period [3650]: " EXPIRED_DAYS
         EXPIRED_DAYS=${EXPIRED_DAYS:-3650}
 
-        export CLUSTER_NAME APISERVER_CLUSTER_IP MASTERS CERT_CN EXPIRED_DAYS
+        export BASE_DOMAIN CLUSTER_NAME APISERVER_CLUSTER_IP MASTERS CERT_CN EXPIRED_DAYS
 
         export CA_CERT="$CERT_DIR/ca.crt"
         export CA_KEY="$CERT_DIR/ca.key"
