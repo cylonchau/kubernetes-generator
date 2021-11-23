@@ -73,7 +73,7 @@ function set_evn(){
         read -p "Pls Enter Organization Name [chinamobile]: " CERT_O
         CERT_O=${CERT_O:-chinamobile}
 
-        read -p "Pls Enter CA Common Name [ectd-ca]: " CERT_CN
+        read -p "Pls Enter CA Common Name [etcd-ca]: " CERT_CN
         CERT_CN=${CERT_CN:-etcd-ca}
 
         read -p "Pls Enter Certificate validity period [3650]: " EXPIRED_DAYS
@@ -88,7 +88,6 @@ function set_evn(){
 function openssl_req() {
     openssl genrsa -out ${1}/${2}.key 2048
     echo "Generating ${1}/${2}.csr"
-    echo $BASE_DOMAIN
     openssl req -config openssl.conf -new -sha256 \
         -key ${1}/${2}.key -out ${1}/${2}.csr -subj "$3"
 }
@@ -362,7 +361,7 @@ EOF
 }
 
 case "$1" in
-	"k8s"|"K8S"|"kubernetes"|"KUBERNETES")
+    "k8s"|"K8S"|"kubernetes"|"KUBERNETES")
         set_evn kubernetes
         generate_kubernetes_certificates
 		;;
