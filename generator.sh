@@ -16,7 +16,6 @@ function set_evn(){
     if [ ${#} -eq 1 ]; then
         DIR="$1"
     fi
-    echo $DIR
     export DIR
     export CERT_DIR=$DIR/pki
     mkdir -p $CERT_DIR
@@ -105,6 +104,10 @@ function openssl_sign() {
 
 function generate_kubernetes_certificates() {
     # If supplied, generate a new etcd CA and associated certs.
+    if [ -n ${ETCD_CERTS_DIR} ]; then
+       export ETCD_CERTS_DIR=${DIR}/etcd
+    fi
+
     if [ -n $FRONT_PROXY_CA_CERT ]; then
         front_proxy_dir=${DIR}/front-proxy
         if [ ! -d "$front_proxy_dir" ]; then
