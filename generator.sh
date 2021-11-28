@@ -174,23 +174,23 @@ function generate_kubernetes_certificates() {
 
         # echo "Generating kubeconfig for kube-controller-manager"
         cat > ${master_dir}/auth/controller-manager.conf << EOF
-    apiVersion: v1
+apiVersion: v1
 kind: Config
 clusters:
 - name: ${CLUSTER_NAME}
-cluster:
+  cluster:
     server: https://${master}.${BASE_DOMAIN}:6443
     certificate-authority-data: $( openssl base64 -A -in $CA_CERT ) 
 users:
 - name: system:kube-controller-manager
-user:
+  user:
     client-certificate-data: $( openssl base64 -A -in ${master_dir}/pki/kube-controller-manager.crt ) 
     client-key-data: $( openssl base64 -A -in ${master_dir}/pki/kube-controller-manager.key ) 
 contexts:
 - context:
     cluster: ${CLUSTER_NAME}
     user: system:kube-controller-manager
-name: system:kube-controller-manager@${CLUSTER_NAME}
+  name: system:kube-controller-manager@${CLUSTER_NAME}
 current-context: system:kube-controller-manager@${CLUSTER_NAME}
 EOF
 
@@ -200,19 +200,19 @@ apiVersion: v1
 kind: Config
 clusters:
 - name: ${CLUSTER_NAME}
-cluster:
+  cluster:
     server: https://${master}.${BASE_DOMAIN}:6443
     certificate-authority-data: $( openssl base64 -A -in $CA_CERT ) 
 users:
 - name: system:kube-scheduler
-user:
+  user:
     client-certificate-data: $( openssl base64 -A -in ${master_dir}/pki/kube-scheduler.crt ) 
     client-key-data: $( openssl base64 -A -in ${master_dir}/pki/kube-scheduler.key ) 
 contexts:
 - context:
     cluster: ${CLUSTER_NAME}
     user: system:kube-scheduler
-name: system:kube-scheduler@${CLUSTER_NAME}
+  name: system:kube-scheduler@${CLUSTER_NAME}
 current-context: system:kube-scheduler@${CLUSTER_NAME}
 EOF
 
@@ -222,23 +222,22 @@ apiVersion: v1
 kind: Config
 clusters:
 - name: ${CLUSTER_NAME}
-cluster:
+  cluster:
     server: https://${master}.${BASE_DOMAIN}:6443
     certificate-authority-data: $( openssl base64 -A -in $CA_CERT ) 
 users:
 - name: k8s-admin
-user:
+  user:
     client-certificate-data: $( openssl base64 -A -in ${master_dir}/pki/apiserver-kubelet-client.crt ) 
     client-key-data: $( openssl base64 -A -in ${master_dir}/pki/apiserver-kubelet-client.key ) 
 contexts:
 - context:
     cluster: ${CLUSTER_NAME}
     user: k8s-admin
-name: k8s-admin@${CLUSTER_NAME}
+  name: k8s-admin@${CLUSTER_NAME}
 current-context: k8s-admin@${CLUSTER_NAME}
 EOF
-    done
-
+done
 
     # Generate key and cert for kubelet
     kubelet_dir=${DIR}/kubelet
@@ -256,19 +255,19 @@ apiVersion: v1
 kind: Config
 clusters:
 - name: ${CLUSTER_NAME}
-cluster:
+  cluster:
     server: https://${CLUSTER_NAME}-api.${BASE_DOMAIN}:6443
     certificate-authority-data: $( openssl base64 -A -in $CA_CERT ) 
 users:
 - name: system:kube-proxy
-user:
+  user:
     client-certificate-data: $( openssl base64 -A -in ${kubelet_dir}/pki/kube-proxy.crt ) 
     client-key-data: $( openssl base64 -A -in ${kubelet_dir}/pki/kube-proxy.key ) 
 contexts:
 - context:
     cluster: ${CLUSTER_NAME}
     user: system:kube-proxy
-name: system:kube-proxy@${CLUSTER_NAME}
+  name: system:kube-proxy@${CLUSTER_NAME}
 current-context: system:kube-proxy@${CLUSTER_NAME}
 EOF
 
@@ -277,18 +276,18 @@ apiVersion: v1
 kind: Config
 clusters:
 - name: ${CLUSTER_NAME}
-cluster:
+  cluster:
     server: https://${CLUSTER_NAME}-api.${BASE_DOMAIN}:6443
     certificate-authority-data: $( openssl base64 -A -in $CA_CERT ) 
 users:
 - name: system:bootstrapper
-user:
+  user:
     token: ${BOOTSTRAP_TOKEN}
 contexts:
 - context:
     cluster: ${CLUSTER_NAME}
     user: system:bootstrapper
-name: system:bootstrapper@${CLUSTER_NAME}
+  name: system:bootstrapper@${CLUSTER_NAME}
 current-context: system:bootstrapper@${CLUSTER_NAME}
 EOF
 
@@ -306,11 +305,11 @@ EOF
 apiVersion: v1
 kind: Secret
 metadata:
-name: ingress-tls-secret
-namespace: kube-system
+  name: ingress-tls-secret
+  namespace: kube-system
 data:
-tls.crt: $( openssl base64 -A -in ${ingress_dir}/ingress-server.crt )
-tls.key: $( openssl base64 -A -in ${ingress_dir}/ingress-server.key )
+  tls.crt: $( openssl base64 -A -in ${ingress_dir}/ingress-server.crt )
+  tls.key: $( openssl base64 -A -in ${ingress_dir}/ingress-server.key )
 EOF
 
     # Clean up openssl config
