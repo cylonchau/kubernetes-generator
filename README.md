@@ -10,4 +10,4 @@ chmod +x generator
 ./generator
 ```
 
-![img1](./img1.png)
+![img1](https://github.com/CylonChau/kubernetes-certificates-generator/raw/main/img1.png)

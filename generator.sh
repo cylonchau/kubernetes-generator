@@ -13,9 +13,9 @@ function cert_kubernetes(){
     BASE_DOMAIN=${BASE_DOMAIN:-my-k8s.k8s.io}
 
     read -p "Pls Enter Kubernetes Cluster Name [kubernetes]: " CLUSTER_NAME
-    echo -n -e "Enter the IP Address in default namespace \n of the Kubernetes API Server[10.96.0.1]: "
+    echo -n -e "Enter the IP Address in default namespace \n of the Kubernetes API Server [10.96.0.1]: "
     read  APISERVER_CLUSTER_IP
-    read -p "Pls Enter Master servers name[master01 master02 master03]: " MASTERS
+    read -p "Pls Enter Master servers name [master01 master02 master03]: " MASTERS
 
     CLUSTER_NAME=${CLUSTER_NAME:-kubernetes}
     APISERVER_CLUSTER_IP=${APISERVER_CLUSTER_IP:-10.96.0.1}
@@ -36,7 +36,7 @@ function cert_kubernetes(){
         read -p "pause" A
     else
         echo "Generating CA key and self signed cert." 
-        openssl genrsa -out $CERT_DIR/ca.key 4096
+        openssl genrsa -out $CERT_DIR/ca.key 2048
         openssl req -config openssl.conf \
             -new -x509 -days 3650 -sha256 \
             -key $CERT_DIR/ca.key -out $CERT_DIR/ca.crt \
@@ -145,13 +145,13 @@ function kubeconfig_approve(){
 function generate_kubernetes_certificates() {
     # If supplied, generate a new etcd CA and associated certs.
     if [ !-n $ETCD_CERTS_DIR ]; then
-       export ETCD_CERTS_DIR=${ROOT}/etcd
+       export ETCD_CERTS_DIR=${WORK_DIR}/cert/etcd
     fi
 
     if [ -n $FRONT_PROXY_CA_CERT ]; then
         front_proxy_dir=${DIR}/front-proxy
         if [ ! -d "$front_proxy_dir" ]; then
-        mkdir $front_proxy_dir
+            mkdir $front_proxy_dir
         fi
 
         openssl genrsa -out ${front_proxy_dir}/front-proxy-ca.key 2048
@@ -200,13 +200,13 @@ function generate_kubernetes_certificates() {
         # echo "Generating the ServiceAccount key for apiserver"
         openssl ecparam -name secp521r1 -genkey -noout -out ${master_dir}/pki/sa.key
         openssl ec -in ${master_dir}/pki/sa.key -outform PEM -pubout -out ${master_dir}/pki/sa.pub
-    
+
         # echo "Copy token file"
         cp /tmp/token.csv ${master_dir}/
         
         if [ -d "$ETCD_CERTS_DIR" ]; then
             # echo "Copy etcd client key and certs"
-        cp $ETCD_CERTS_DIR/pki/apiserver-etcd.{key,crt} ${master_dir}/pki/
+            cp $ETCD_CERTS_DIR/pki/apiserver-etcd.{key,crt} ${master_dir}/pki/
         fi
 
         # echo "Generating kubeconfig for kube-controller-manager"
@@ -217,9 +217,6 @@ function generate_kubernetes_certificates() {
         # $4 client-ca
         # $5 client-key
         kubeconfig_approve ${CLUSTER_NAME} system:kube-controller-manager controller-manager.conf kube-controller-manager.crt kube-controller-manager.key
-
-
-
 
         # echo "Generating kubeconfig for kube-scheduler"
         kubeconfig_approve ${CLUSTER_NAME} system:kube-scheduler scheduler.conf kube-scheduler.crt kube-scheduler.key
@@ -265,8 +262,8 @@ function generate_kubernetes_certificates() {
 
 
 function generate_etcd_certificates() {
-        if [ -z "$CA_KEY" -o -z "$CA_CERT" ]; then
-        openssl genrsa -out $CERT_DIR/ca.key 4096
+    if [ -z "$CA_KEY" -o -z "$CA_CERT" ]; then
+        openssl genrsa -out $CERT_DIR/ca.key 2048
         openssl req -config openssl.conf \
             -new -x509 -days ${EXPIRED_DAYS} -sha256 \
             -key $CERT_DIR/ca.key -extensions v3_ca \
@@ -330,7 +327,7 @@ function DownloadKube(){
     [ -d ${TMP_DIR} ] && rm -fr ${TMP_DIR}
     mkdir -p ${TMP_DIR}
     case "$code" in
-	404|"404")
+    404|"404")
         echo -n -e "Kubernetes version v${Kubernetes_Version} Not Found.\n"
         exit ${NotFount}
         ;;
@@ -367,7 +364,7 @@ function ActionInitail(){
     export ROLE_PACKAGE=${ROLE_PACKAGE:-all}
 
     case "$ROLE_PACKAGE" in
-	"master"|"MASTER")
+    "master"|"MASTER")
         InitAPIServer
         InitControllerManager
         InitScheduler
@@ -664,11 +661,11 @@ Requires=docker.service
 WorkingDirectory=${LET_CONF_DIR}
 EnvironmentFile=-/etc/kubernetes/${LET_NAME}
 ExecStart=${LET_DIR}/${LET_NAME} \\
-	\$KUBELET_API_SERVER \\
-	\$KUBELET_ADDRESS \\
-	\$KUBELET_PORT \\
-	\$KUBELET_HOSTNAME \\
-	\$KUBELET_ARGS
+    \$KUBELET_API_SERVER \\
+    \$KUBELET_ADDRESS \\
+    \$KUBELET_PORT \\
+    \$KUBELET_HOSTNAME \\
+    \$KUBELET_ARGS
 Restart=on-failure
 KillMode=process
 RestartSec=10
@@ -737,22 +734,22 @@ EOF
 
 function InitRsyslogConigFile(){
     cat > ${LOG_CONFIG_DIR}/kubernetes.conf << EOF
-if ($programname == '${APISERV_NAME}') then {
+if (\$programname == '${APISERV_NAME}') then {
    action(type="omfile" file="/var/log/apiserver.log")
    stop
-} else if ($programname == '${SCHEDR_NAME}') then {
+} else if (\$programname == '${SCHEDR_NAME}') then {
    action(type="omfile" file="/var/log/scheduler.log")
    stop
-} else if ($programname == '${CONTRO_NAME}') then {
+} else if (\$programname == '${CONTRO_NAME}') then {
    action(type="omfile" file="/var/log/controller-manager.log")
    stop
-} else if ($programname == '${LET_NAME}') then {
+} else if (\$programname == '${LET_NAME}') then {
    action(type="omfile" file="/var/log/kubelet.log")
    stop
-} else if ($programname == '${PROXY_NAME}') then {
+} else if (\$programname == '${PROXY_NAME}') then {
    action(type="omfile" file="/var/log/kube-proxy.log")
    stop
-} else if ($programname == 'etcd') then {
+} else if (\$programname == 'etcd') then {
    action(type="omfile" file="/var/log/etcd.log")
    stop
 }
