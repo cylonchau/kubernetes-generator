@@ -9,6 +9,7 @@ A simple script to generation of certificates, kubernetes config files, systemd 
 
 - Modify  openssl.conf and change it to the ip and domain you need at the bottom. The variable part is the domain name entered when generating the certificate, and the others are other access addresses required by the kubernetes cluster.
 
+
 ```
 chmod +x generator
 ./generator
