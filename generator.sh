@@ -7,15 +7,17 @@ ROOT=$(cd $(dirname $0); pwd)
 export ROOT
 
 function cert_kubernetes(){
-
-    echo -n -e "\n\n\033[31mBegin generate kubernetes certifiate. \033[0m\n\n"
+    echo -n -e "\n\033[41;37mLet's configure some parameters below to prepare etcd certificate generation.\033[0m\n\n" 
     read -p "Pls Enter Kubernetes Domain Name [my-k8s.k8s.io]: " BASE_DOMAIN
     BASE_DOMAIN=${BASE_DOMAIN:-my-k8s.k8s.io}
 
     read -p "Pls Enter Kubernetes Cluster Name [kubernetes]: " CLUSTER_NAME
-    echo -n -e "Enter the IP Address in default namespace \n of the Kubernetes API Server [10.96.0.1]: "
+    echo -n -e "Enter the IP Address in kubeconfig \n of the Kubernetes API Server IP [10.96.0.1]: "
     read  APISERVER_CLUSTER_IP
     read -p "Pls Enter Master servers name [master01 master02 master03]: " MASTERS
+    
+    read -p "Pls Enter kubeconfig's server ip [${BASE_DOMAIN}]: " KUBECONFIG_SERVER_IP
+    KUBECONFIG_SERVER_IP=${KUBECONFIG_SERVER_IP:-${BASE_DOMAIN}}
 
     CLUSTER_NAME=${CLUSTER_NAME:-kubernetes}
     APISERVER_CLUSTER_IP=${APISERVER_CLUSTER_IP:-10.96.0.1}
@@ -27,7 +29,7 @@ function cert_kubernetes(){
     read -p "Pls Enter Certificate validity period [3650]: " EXPIRED_DAYS
     EXPIRED_DAYS=${EXPIRED_DAYS:-3650}
 
-    export BASE_DOMAIN CLUSTER_NAME APISERVER_CLUSTER_IP MASTERS CERT_CN EXPIRED_DAYS
+    export BASE_DOMAIN CLUSTER_NAME APISERVER_CLUSTER_IP MASTERS CERT_CN EXPIRED_DAYS KUBECONFIG_SERVER_IP
 
     export CA_CERT="$CERT_DIR/ca.crt"
     export CA_KEY="$CERT_DIR/ca.key"
@@ -45,7 +47,7 @@ function cert_kubernetes(){
 }
 
 function cert_etcd(){
-    echo -n -e "\n\n\033[31mBegin generate etcd certifiate. \033[0m\n\n"
+    echo -n -e "\n\033[41;37mLet's configure some parameters below to prepare etcd certificate generation.\033[0m\n\n" 
     read -p "Pls Enter etcd Domain Name [my-etcd]: " BASE_DOMAIN
     BASE_DOMAIN=${BASE_DOMAIN:-my-etcd}
 
@@ -103,8 +105,8 @@ function openssl_sign() {
 # $4 client-ca
 # $5 client-key
 function kubeconfig_approve(){
-    case $1 in
-    "system:kube-proxy")
+    case $2 in
+    "system:kube-proxy"|"system:bootstrapper")
         export Client_CERT_DIR=${kubelet_dir}
         ;;
     *)
@@ -113,14 +115,13 @@ function kubeconfig_approve(){
     esac
     ${WORK_DIR}/bin/kubectl config set-cluster ${1} \
         --embed-certs=true \
-        --server=https://${master}.${BASE_DOMAIN}:6443 \
+        --server=https://${KUBECONFIG_SERVER_IP}:6443 \
         --certificate-authority=$CA_CERT \
         --kubeconfig=${Client_CERT_DIR}/auth/${3}
     
-    case $1 in
+    case $2 in
     "system:bootstrapper")
         ${WORK_DIR}/bin/kubectl config set-credentials ${2} \
-            --embed-certs=true \
             --token=${BOOTSTRAP_TOKEN} \
             --kubeconfig=${Client_CERT_DIR}/auth/${3}
         ;;
@@ -151,7 +152,7 @@ function generate_kubernetes_certificates() {
     if [ -n $FRONT_PROXY_CA_CERT ]; then
         front_proxy_dir=${DIR}/front-proxy
         if [ ! -d "$front_proxy_dir" ]; then
-            mkdir $front_proxy_dir
+        mkdir $front_proxy_dir
         fi
 
         openssl genrsa -out ${front_proxy_dir}/front-proxy-ca.key 2048
@@ -200,7 +201,7 @@ function generate_kubernetes_certificates() {
         # echo "Generating the ServiceAccount key for apiserver"
         openssl ecparam -name secp521r1 -genkey -noout -out ${master_dir}/pki/sa.key
         openssl ec -in ${master_dir}/pki/sa.key -outform PEM -pubout -out ${master_dir}/pki/sa.pub
-
+    
         # echo "Copy token file"
         cp /tmp/token.csv ${master_dir}/
         
@@ -208,9 +209,7 @@ function generate_kubernetes_certificates() {
             # echo "Copy etcd client key and certs"
             cp $ETCD_CERTS_DIR/pki/apiserver-etcd.{key,crt} ${master_dir}/pki/
         fi
-
         # echo "Generating kubeconfig for kube-controller-manager"
-
         # $1 cluster_name
         # $2 username
         # $3 filename
@@ -262,7 +261,7 @@ function generate_kubernetes_certificates() {
 
 
 function generate_etcd_certificates() {
-    if [ -z "$CA_KEY" -o -z "$CA_CERT" ]; then
+        if [ -z "$CA_KEY" -o -z "$CA_CERT" ]; then
         openssl genrsa -out $CERT_DIR/ca.key 2048
         openssl req -config openssl.conf \
             -new -x509 -days ${EXPIRED_DAYS} -sha256 \
@@ -332,7 +331,7 @@ function DownloadKube(){
         exit ${NotFount}
         ;;
     *)
-        echo -n -e "\033[31mBegin download kubernetes v${Kubernetes_Version}. \033[0m\n\n"
+        echo -n -e "\n\033[41;37mBegin download kubernetes v${Kubernetes_Version}.\033[0m\n\n"
         wget -t 3 -P ${TMP_DIR} ${KubernetesDownloadUrl}
         ;;
     esac    
@@ -357,25 +356,30 @@ function ExtractKube(){
     rm -fr ${TMP_DIR}
 }
 
+function CleanBin(){
+    rm -fr ${WORK_DIR}/bin
+}
+
 function ActionInitail(){
-    echo -n -e "\nLet configure some parameters below to prepare the initial kubernetes config file \n \
-        and systemd file.\n\n"
-    read -p "Please enter package to install [master|node|all]: " ROLE_PACKAGE
-    export ROLE_PACKAGE=${ROLE_PACKAGE:-all}
+    echo -n -e "\n\033[41;37mLet's configure some parameters below to prepare the initial kubernetes config file and systemd file. \033[0m\n" 
+    
+    echo -n -e "    1.master.\n    2.node\n    3.all(master and node).\n"
+    read -p "Please enter the which to install [3]: " ROLE_PACKAGE
+    export ROLE_PACKAGE=${ROLE_PACKAGE:-3}
 
     case "$ROLE_PACKAGE" in
-    "master"|"MASTER")
+    1)
         InitAPIServer
         InitControllerManager
         InitScheduler
         InitRsyslogConigFile
         ;;
-    "node"|"NODE")
+    2)
         InitProxy
         InitKubelet
         InitRsyslogConigFile
         ;;
-    "all"|"ALL")
+    3)
         InitAPIServer
         InitControllerManager
         InitScheduler
@@ -391,7 +395,8 @@ function ActionInitail(){
 }
 
 function InitAPIServer(){
-
+    echo -e -n "\nLet's configure some parameters below to prepare to generate
+        the \033[41;37mkube-apiserver\033[0m config file.\n\n" 
     read -p "Please enter the svc \"kube-apiserver\" path [/usr/local/bin]: " APISERV_DIR
     export APISERV_DIR=${APISERV_DIR:-/usr/local/bin}
     read -p "Please enter the svc \"kube-apiserver\" service name [kube-apiserver]: " APISERV_NAME
@@ -425,10 +430,11 @@ function InitAPIServer(){
 KUBE_API_ADDRESS="--advertise-address=${APISERV_LISTEN}"
 
 # The port on the local server to listen on.
-KUBE_API_PORT="--secure-port=6443 --insecure-port=0"
+KUBE_API_PORT="--secure-port=6443"
 
 # Comma separated list of nodes in the etcd cluster
-KUBE_ETCD_SERVERS=""
+# KUBE_ETCD_SERVERS="--etcd-servers=https://10.0.0.4:2379,https://10.0.0.5:2379,https://10.0.0.6:2379"
+KUBE_ETCD_SERVERS="--etcd-servers=https://"
 
 # Address range to use for services
 KUBE_SERVICE_ADDRESSES="--service-cluster-ip-range=${IP_RANGE}"
@@ -444,8 +450,8 @@ KUBE_API_ARGS="--allow-privileged=${ALLOW_PRIVILEGED} \\
     --enable-bootstrap-token-auth=true \\
     --client-ca-file=${CA_PATH}/ca.crt \\
     --etcd-cafile=${ETCD_CA}/ca.crt \\
-    --etcd-certfile=${CA_PATH}/apiserver-etcd-client.crt \\
-    --etcd-keyfile=${CA_PATH}/apiserver-etcd-client.key \\
+    --etcd-certfile=${CA_PATH}/apiserver-etcd.crt \\
+    --etcd-keyfile=${CA_PATH}/apiserver-etcd.key \\
     --kubelet-client-certificate=${CA_PATH}/apiserver-kubelet-client.crt \\
     --kubelet-client-key=${CA_PATH}/apiserver-kubelet-client.key \\
     --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname \\
@@ -466,7 +472,6 @@ EOF
 Description=Kubernetes API Server
 Documentation=https://github.com/kubernetes
 After=network.target
-After=etcd.service
 
 [Service]
 EnvironmentFile=-/etc/kubernetes/${APISERV_NAME}
@@ -479,7 +484,6 @@ ExecStart=${APISERV_DIR}/${APISERV_NAME} \\
         \$KUBELET_PORT \\
         \$KUBE_API_ARGS
 Restart=on-failure
-Type=notify
 LimitNOFILE=65536
 KillSignal=SIGTERM
 StandardOutput=syslog
@@ -492,7 +496,8 @@ EOF
 }
 
 function InitControllerManager(){
-
+    echo -n -e "\nLet's configure some parameters below to prepare to 
+        generate the \033[41;37mkube-controller-manager\033[0m config file.\n\n" 
     read -p "Please enter kube-controller-manager listen addr [127.0.0.1]: " CM_LISTEN
     export CM_LISTEN=${CM_LISTEN:-127.0.0.1}
 
@@ -516,16 +521,16 @@ function InitControllerManager(){
 # You can add your configurion own!
 KUBE_CONTROLLER_MANAGER_ARGS="--v=0 \\
     --logtostderr=true \\
-    --bind-address=${CM_LISTEN} \
+    --bind-address=${CM_LISTEN} \\
     --allocate-node-cidrs=true \\
     --authentication-kubeconfig=/etc/kubernetes/auth/controller-manager.conf \\
     --authorization-kubeconfig=/etc/kubernetes/auth/controller-manager.conf \\
-    --client-ca-file=${kubeconfig}/ca.crt \\
+    --client-ca-file=${CA_PATH}/ca.crt \\
     --root-ca-file=${CA_PATH}/ca.crt \\
     --cluster-cidr=${CM_CIDR} \\
     --cluster-signing-cert-file=/etc/kubernetes/pki/ca.crt \\
     --cluster-signing-key-file=/etc/kubernetes/pki/ca.key \\
-    --controllers=*,bootstrapsigner,tokencleaner \
+    --controllers=*,bootstrapsigner,tokencleaner \\
     --kubeconfig=/etc/kubernetes/auth/controller-manager.conf \\
     --leader-elect=true \\
     --node-cidr-mask-size=24 \\
@@ -539,16 +544,14 @@ EOF
 Description=Kubernetes Controller Manager
 Documentation=https://github.com/kubernetes
 After=network.target
-After=etcd.service
 
 [Service]
 EnvironmentFile=-/etc/kubernetes/${CONTRO_NAME}
 User=kube
-ExecStart=${APISERV_DIR}/${APISERV_NAME} \\
+ExecStart=${APISERV_DIR}/${CONTRO_NAME} \\
     \$KUBE_MASTER \\
     \$KUBE_CONTROLLER_MANAGER_ARGS
 Restart=on-failure
-Type=notify
 LimitNOFILE=65536
 KillSignal=SIGTERM
 StandardOutput=syslog
@@ -562,6 +565,8 @@ EOF
 
 
 function InitScheduler(){
+    echo -n -e "\nLet's configure some parameters below to prepare to
+        generate the \033[41;37mkube-scheduler\033[0m config file.\n\n" 
     read -p "Please enter the svc \"kube-scheduler\" path [/usr/local/bin]: " SCHEDR_DIR
     export SCHEDR_DIR=${SCHEDR_DIR:-/usr/local/bin}
     read -p "Please enter the svc \"kube-scheduler\" service name [kube-scheduler]: " SCHEDR_NAME
@@ -595,7 +600,6 @@ ExecStart=${SCHEDR_DIR}/${SCHEDR_NAME} \\
     \$KUBE_MASTER \\
     \$KUBE_SCHEDULER_ARGS
 Restart=on-failure
-Type=notify
 LimitNOFILE=65536
 KillSignal=SIGTERM
 StandardOutput=syslog
@@ -608,7 +612,8 @@ EOF
 }
 
 function InitKubelet(){
-
+    echo -n -e "\nLet's configure some parameters below to prepare to
+        generate the \033[41;37mkubelet\033[0m config file.\n\n" 
     read -p "Please enter the svc \"kubelet\" path [/usr/local/bin]: " LET_DIR
     export LET_DIR=${LET_DIR:-/usr/local/bin}
     read -p "Please enter the svc \"kubelet\" service name [kubelet]: " LET_NAME
@@ -658,6 +663,7 @@ After=docker.service
 Requires=docker.service
 
 [Service]
+User=kube
 WorkingDirectory=${LET_CONF_DIR}
 EnvironmentFile=-/etc/kubernetes/${LET_NAME}
 ExecStart=${LET_DIR}/${LET_NAME} \\
@@ -673,14 +679,15 @@ KillSignal=SIGTERM
 StandardOutput=syslog
 StandardError=syslog
 SyslogIdentifier=${LET_NAME}
-Type=notify
 
 [Install]
 WantedBy=multi-user.target
 EOF
 }
 
-function InitProxy(){    
+function InitProxy(){
+    echo -n -e "\nLet's configure some parameters below to prepare to
+        generate the \033[41;37mkube-proxy\033[0m config file.\n\n" 
     read -p "Please enter the svc \"kube-proxy\" path [/usr/local/bin]: " PROXY_DIR
     export PROXY_DIR=${PROXY_DIR:-/usr/local/bin}
     read -p "Please enter the svc \"kube-proxy\" service name [kube-proxy]: " PROXY_NAME
@@ -715,12 +722,12 @@ Documentation=https://github.com/kubernetes
 After=network.target
 
 [Service]
+User=kube
 EnvironmentFile=-/etc/kubernetes/${PROXY_NAME} 
 ExecStart=${PROXY_DIR}/${PROXY_NAME} \\
     \$KUBE_MASTER \\
     \$KUBE_PROXY_ARGS
 Restart=on-failure
-Type=notify
 LimitNOFILE=65536
 KillSignal=SIGTERM
 StandardOutput=syslog
@@ -785,9 +792,9 @@ function set_evn(){
 }
 
 function MAIN(){
-    echo -n -e "generated content\n    1.only certificates for etcd and kubernetes.\n    2.certificates and config files.\n"
-    read -p "Please enter the which to generate [default=1]: " INSTALL_OPS
-    INSTALL_OPS=${INSTALL_OPS:-1}
+    echo -n -e "generated content\n    1.only certificates for etcd and kubernetes.\n    2.only donwload kubernetes\n    3.certificates and config files.\n"
+    read -p "Please enter the which to generate [3]: " INSTALL_OPS
+    INSTALL_OPS=${INSTALL_OPS:-3}
 
     case ${INSTALL_OPS} in
     1)
@@ -795,8 +802,14 @@ function MAIN(){
         DownloadKube
         ExtractKube
         Generate_Certificates
+        CleanBin
         ;;
     2)  
+        set_evn
+        DownloadKube
+        ExtractKube
+        ;;
+    3)
         set_evn
         DownloadKube
         ExtractKube
@@ -809,5 +822,4 @@ function MAIN(){
         ;;
     esac 
 }
-
 MAIN
