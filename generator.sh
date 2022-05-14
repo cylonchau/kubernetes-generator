@@ -230,6 +230,7 @@ function generate_kubernetes_certificates() {
 
     openssl_req ${kubelet_dir}/pki kube-proxy "/CN=system:kube-proxy"
     openssl_sign $CA_CERT $CA_KEY ${kubelet_dir}/pki kube-proxy client_cert
+
     rm -f ${kubelet_dir}/pki/kube-proxy.csr
 
     # Copy CA Cert to Node
@@ -625,14 +626,8 @@ function InitKubelet(){
     read -p "Please enter port for the kubelet [10250]: " LET_PORT
     export LET_PORT=${LET_PORT:-10250}
 
-    read -p "Please enter port for the kubelet config dir [/var/lib/kubelet]: " LET_CONF_DIR
-    export LET_CONF_DIR=${LET_CONF_DIR:-/var/lib/kubelet}
-
     read -p "Please enter kubeconfig path for the kubelet [/etc/kubernetes/auth]: " LET_KUBECONF_DIR
     export LET_KUBECONF_DIR=${LET_KUBECONF_DIR:-/etc/kubernetes/auth}
-
-    read -p "Please enter the bootstrap path for kubelet [/etc/kubernetes/auth]: " LET_BOOTSTRAP_DIR
-    export LET_BOOTSTRAP_DIR=${LET_BOOTSTRAP_DIR:-/etc/kubernetes/auth}
 
     cat > ${CONF_DIR}/${LET_NAME} << EOF
 ###
@@ -648,9 +643,9 @@ KUBELET_ADDRESS="--address=${LET_LISTEN}"
 KUBELET_ARGS="--v=0 \\
     --logtostderr=true \\
     --network-plugin=cni \\
-    --config=${LET_CONF_DIR}/${LET_NAME}-config.yaml \\
+    --config=${CONF_DIR}/${LET_NAME}-config.yaml \\
     --kubeconfig=${LET_KUBECONF_DIR}/${LET_NAME}.conf \\
-    --bootstrap-kubeconfig=${LET_BOOTSTRAP_DIR}/bootstrap.conf"
+    --bootstrap-kubeconfig=${LET_KUBECONF_DIR}/bootstrap.conf"
 EOF
     ${WORK_DIR}/bin/kubeadm config print init-defaults --component-configs KubeletConfiguration|grep -A 1000 'apiVersion: kubelet.config.k8s.io/v1beta1' > ${CONF_DIR}/${LET_NAME}-config.yaml
     sed -i 's@0s@20s@g' ${CONF_DIR}/${LET_NAME}-config.yaml
@@ -696,12 +691,6 @@ function InitProxy(){
     read -p "Please enter kube-proxy listen addr [0.0.0.0]: " PROXY_LISTEN
     export PROXY_LISTEN=${PROXY_LISTEN:-0.0.0.0}
 
-    read -p "Please enter kubeconfig path for the kube-proxy [/var/lib/${PROXY_NAME}]: " PROXY_KUBECONF_DIR
-    export PROXY_KUBECONF_DIR=${PROXY_KUBECONF_DIR:-/var/lib/${PROXY_NAME}}
-
-    read -p "Please enter the bootstrap path for kube-proxy [/etc/kubernetes/auth]: " PROXY_BOOTSTRAP_DIR
-    export PROXY_BOOTSTRAP_DIR=${PROXY_BOOTSTRAP_DIR:-/etc/kubernetes/auth}
-
     cat > ${CONF_DIR}/${PROXY_NAME} << EOF
 ###
 # kubernetes proxy config
@@ -709,7 +698,7 @@ function InitProxy(){
 # You can add your configuration own!
 KUBE_PROXY_ARGS="--v=0 \\
     --logtostderr=true \\
-    --config=${PROXY_KUBECONF_DIR}/${PROXY_NAME}-config.yaml"
+    --config=${CONF_DIR}/${PROXY_NAME}-config.yaml"
 EOF
     ${WORK_DIR}/bin/kubeadm config print init-defaults --component-configs KubeProxyConfiguration|grep -A 1000 'kubeproxy.config.k8s.io/v1alpha1' > ${CONF_DIR}/${PROXY_NAME}-config.yaml
     sed -i "s@kubeconfig: /var/lib/kube-proxy/kubeconfig.conf@kubeconfig: /etc/kubernetes/${PROXY_NAME}.conf@g" ${CONF_DIR}/${PROXY_NAME}-config.yaml
@@ -776,11 +765,11 @@ function END(){
 
 
 function set_evn(){
-    WORK_DIR=${WORK_DIR:-kubernetes-generate}
+    WORK_DIR=${WORK_DIR:-output-generate}
     if [ ${#} -eq 1 ]; then
         DIR="$1"
     fi
-    export WORK_DIR=${ROOT}/kubernetes-generate
+    export WORK_DIR=${ROOT}/output-generate
     export CONF_DIR=$WORK_DIR/kubernetes
     export SYSTEMD_DIR=$WORK_DIR/system
     export LOG_CONFIG_DIR=$WORK_DIR/rsyslog
