@@ -1,7 +1,9 @@
 #!/bin/bash -e
 
+set -e
 NotFount=204
 IllegalContent=205
+CommondNotFound=127
 
 ROOT=$(cd $(dirname $0); pwd)
 export ROOT
@@ -370,22 +372,16 @@ function ActionInitail(){
 
     case "$ROLE_PACKAGE" in
     1)
-        InitAPIServer
-        InitControllerManager
-        InitScheduler
+        INIT_SERVER
         InitRsyslogConigFile
         ;;
     2)
-        InitProxy
-        InitKubelet
+        INIT_CLIENT
         InitRsyslogConigFile
         ;;
     3)
-        InitAPIServer
-        InitControllerManager
-        InitScheduler
-        InitProxy
-        InitKubelet
+        INIT_SERVER
+        INIT_CLIENT
         InitRsyslogConigFile
         ;;
     *)  
@@ -395,12 +391,20 @@ function ActionInitail(){
     esac   
 }
 
+function INIT_SERVER(){
+    echo -e "\n"
+    read -p "Please enter the binary file path of server [/usr/local/bin]: " SERVER_BIN_DIR
+    export SERVER_BIN_DIR=${SERVER_BIN_DIR:-/usr/local/bin}
+    InitAPIServer
+    InitControllerManager
+    InitScheduler
+}
+
 function InitAPIServer(){
     echo -e -n "\nLet's configure some parameters below to prepare to generate
         the \033[41;37mkube-apiserver\033[0m config file.\n\n" 
-    read -p "Please enter the svc \"kube-apiserver\" path [/usr/local/bin]: " APISERV_DIR
-    export APISERV_DIR=${APISERV_DIR:-/usr/local/bin}
-    read -p "Please enter the svc \"kube-apiserver\" service name [kube-apiserver]: " APISERV_NAME
+    
+    read -p "Please enter the \"kube-apiserver\" service name [kube-apiserver]: " APISERV_NAME
     export APISERV_NAME=${APISERV_NAME:-kube-apiserver}
 
     read -p "Please enter cluster IP range [10.96.0.0/12]: " IP_RANGE
@@ -477,7 +481,7 @@ After=network.target
 [Service]
 EnvironmentFile=-/etc/kubernetes/${APISERV_NAME}
 User=kube
-ExecStart=${APISERV_DIR}/${APISERV_NAME} \\
+ExecStart=${SERVER_BIN_DIR}/${APISERV_NAME} \\
         \$KUBE_ETCD_SERVERS \\
         \$KUBE_API_ADDRESS \\
         \$KUBE_API_PORT \\
@@ -508,13 +512,10 @@ function InitControllerManager(){
     read -p "Please enter cluster cetaficate file path [/etc/kubernetes/pki]: " CA_PATH
     export CA_PATH=${CA_PATH:-/etc/kubernetes/pki}
 
-    read -p "Please enter the svc \"kube-controller-manager\" path [/usr/local/bin]: " CONTRO_DIR  
-    export CONTRO_DIR=${CONTRO_DIR:-/usr/local/bin}
-    read -p "Please enter the svc \"kube-controller-manager\" service name [kube-controller-manager]: " CONTRO_NAME
+    read -p "Please enter the \"kube-controller-manager\" service name [kube-controller-manager]: " CONTRO_NAME
     export CONTRO_NAME=${CONTRO_NAME:-kube-controller-manager}
 
     cat > ${CONF_DIR}/${CONTRO_NAME} << EOF
-#
 # The following values are used to configure the kubernetes controller-manager
 #
 # defaults from config and apiserver should be adequate
@@ -549,7 +550,7 @@ After=network.target
 [Service]
 EnvironmentFile=-/etc/kubernetes/${CONTRO_NAME}
 User=kube
-ExecStart=${APISERV_DIR}/${CONTRO_NAME} \\
+ExecStart=${SERVER_BIN_DIR}/${CONTRO_NAME} \\
     \$KUBE_MASTER \\
     \$KUBE_CONTROLLER_MANAGER_ARGS
 Restart=on-failure
@@ -568,16 +569,14 @@ EOF
 function InitScheduler(){
     echo -n -e "\nLet's configure some parameters below to prepare to
         generate the \033[41;37mkube-scheduler\033[0m config file.\n\n" 
-    read -p "Please enter the svc \"kube-scheduler\" path [/usr/local/bin]: " SCHEDR_DIR
-    export SCHEDR_DIR=${SCHEDR_DIR:-/usr/local/bin}
-    read -p "Please enter the svc \"kube-scheduler\" service name [kube-scheduler]: " SCHEDR_NAME
+
+    read -p "Please enter the \"kube-scheduler\" service name [kube-scheduler]: " SCHEDR_NAME
     export SCHEDR_NAME=${SCHEDR_NAME:-kube-scheduler}
 
     read -p "Please enter kube-scheduler listen addr [127.0.0.1]: " SCHED_LISTEN
     export SCHED_LISTEN=${SCHED_LISTEN:-127.0.0.1}
     
     cat > ${CONF_DIR}/${SCHEDR_NAME} << EOF
-###
 # kubernetes scheduler config
 #
 # default config should be adequate
@@ -591,13 +590,13 @@ EOF
 
     cat > ${SYSTEMD_DIR}/${SCHEDR_NAME}.service << EOF
 [Unit]
-Description=Kubernetes Scheduler Plugin
+Description=Kubernetes Scheduler
 Documentation=https://github.com/kubernetes
 
 [Service]
 EnvironmentFile=-/etc/kubernetes/${SCHEDR_NAME}
 User=kube
-ExecStart=${SCHEDR_DIR}/${SCHEDR_NAME} \\
+ExecStart=${SERVER_BIN_DIR}/${SCHEDR_NAME} \\
     \$KUBE_MASTER \\
     \$KUBE_SCHEDULER_ARGS
 Restart=on-failure
@@ -612,12 +611,19 @@ WantedBy=multi-user.target
 EOF
 }
 
+function INIT_CLIENT(){
+    echo -e "\n"
+    read -p "Please enter the binary file path of client [/usr/local/bin]: " CLIENT_BIN_DIR
+    export CLIENT_BIN_DIR=${CLIENT_BIN_DIR:-/usr/local/bin}
+    InitKubelet
+    InitProxy
+}
+
 function InitKubelet(){
     echo -n -e "\nLet's configure some parameters below to prepare to
         generate the \033[41;37mkubelet\033[0m config file.\n\n" 
-    read -p "Please enter the svc \"kubelet\" path [/usr/local/bin]: " LET_DIR
-    export LET_DIR=${LET_DIR:-/usr/local/bin}
-    read -p "Please enter the svc \"kubelet\" service name [kubelet]: " LET_NAME
+    
+    read -p "Please enter the \"kubelet\" service name [kubelet]: " LET_NAME
     export LET_NAME=${LET_NAME:-kubelet}
 
     read -p "Please enter kubelet listen addr [0.0.0.0]: " LET_LISTEN
@@ -643,7 +649,7 @@ KUBELET_ADDRESS="--address=${LET_LISTEN}"
 KUBELET_ARGS="--v=0 \\
     --logtostderr=true \\
     --network-plugin=cni \\
-    --config=${CONF_DIR}/${LET_NAME}-config.yaml \\
+    --config=/etc/kubernetes/${LET_NAME}-config.yaml \\
     --kubeconfig=${LET_KUBECONF_DIR}/${LET_NAME}.conf \\
     --bootstrap-kubeconfig=${LET_KUBECONF_DIR}/bootstrap.conf"
 EOF
@@ -661,7 +667,7 @@ Requires=docker.service
 User=kube
 WorkingDirectory=${LET_CONF_DIR}
 EnvironmentFile=-/etc/kubernetes/${LET_NAME}
-ExecStart=${LET_DIR}/${LET_NAME} \\
+ExecStart=${CLIENT_BIN_DIR}/${LET_NAME} \\
     \$KUBELET_API_SERVER \\
     \$KUBELET_ADDRESS \\
     \$KUBELET_PORT \\
@@ -683,9 +689,7 @@ EOF
 function InitProxy(){
     echo -n -e "\nLet's configure some parameters below to prepare to
         generate the \033[41;37mkube-proxy\033[0m config file.\n\n" 
-    read -p "Please enter the svc \"kube-proxy\" path [/usr/local/bin]: " PROXY_DIR
-    export PROXY_DIR=${PROXY_DIR:-/usr/local/bin}
-    read -p "Please enter the svc \"kube-proxy\" service name [kube-proxy]: " PROXY_NAME
+    read -p "Please enter the \"kube-proxy\" service name [kube-proxy]: " PROXY_NAME
     export PROXY_NAME=${PROXY_NAME:-kube-proxy}
 
     read -p "Please enter kube-proxy listen addr [0.0.0.0]: " PROXY_LISTEN
@@ -698,7 +702,7 @@ function InitProxy(){
 # You can add your configuration own!
 KUBE_PROXY_ARGS="--v=0 \\
     --logtostderr=true \\
-    --config=${CONF_DIR}/${PROXY_NAME}-config.yaml"
+    --config=/etc/kubernetes/${PROXY_NAME}-config.yaml"
 EOF
     ${WORK_DIR}/bin/kubeadm config print init-defaults --component-configs KubeProxyConfiguration|grep -A 1000 'kubeproxy.config.k8s.io/v1alpha1' > ${CONF_DIR}/${PROXY_NAME}-config.yaml
     sed -i "s@kubeconfig: /var/lib/kube-proxy/kubeconfig.conf@kubeconfig: /etc/kubernetes/${PROXY_NAME}.conf@g" ${CONF_DIR}/${PROXY_NAME}-config.yaml
@@ -713,7 +717,7 @@ After=network.target
 [Service]
 User=kube
 EnvironmentFile=-/etc/kubernetes/${PROXY_NAME} 
-ExecStart=${PROXY_DIR}/${PROXY_NAME} \\
+ExecStart=${CLIENT_BIN_DIR}/${PROXY_NAME} \\
     \$KUBE_MASTER \\
     \$KUBE_PROXY_ARGS
 Restart=on-failure
@@ -764,12 +768,13 @@ function END(){
 }
 
 
-function set_evn(){
-    WORK_DIR=${WORK_DIR:-output-generate}
+function set_env(){
+    WORK_DIR=${WORK_DIR:-_output}
     if [ ${#} -eq 1 ]; then
         DIR="$1"
     fi
-    export WORK_DIR=${ROOT}/output-generate
+    [ -d ${ROOT}/_output ] && rm -fr ${ROOT}/_output
+    export WORK_DIR=${ROOT}/_output
     export CONF_DIR=$WORK_DIR/kubernetes
     export SYSTEMD_DIR=$WORK_DIR/system
     export LOG_CONFIG_DIR=$WORK_DIR/rsyslog
@@ -777,34 +782,383 @@ function set_evn(){
     mkdir -p $CONF_DIR
     mkdir -p $SYSTEMD_DIR
     mkdir -p $LOG_CONFIG_DIR
+}
 
+function RPM(){
+    read -p "Please enter the kubernetes version to download [1.18.20]: " Kubernetes_Version
+    export Kubernetes_Version=${Kubernetes_Version:-1.18.20}
+
+    read -p "Is it packaged as an RPM? [Y/N default Y]: " ISRPM
+    export ISRPM=${ISRPM:-Y}
+    if [ ${ISRPM} = "Y" ]; then
+        export RPM_WORK_DIR=${WORK_DIR}/rpmbuild
+        mkdir -pv ${RPM_WORK_DIR}/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+        RPM_LOGIC
+    fi
+}
+
+function RPM_LOGIC(){
+    cp ${LOG_CONFIG_DIR}/kubernetes.conf ${RPM_WORK_DIR}/SOURCES/
+    
+    # server cert files
+    tmpnum=0
+    for n in `ls -tr -I pki -I patches -I ingress -I front-proxy -I kubelet ${WORK_DIR}/cert/kubernetes/`;
+    do  
+        if [ ${tmpnum} == 0 ]
+        then
+            export CERT_NAME=${n}
+        fi
+        [ -d ${RPM_WORK_DIR}/SOURCES/certs/${n} ] || mkdir -pv ${RPM_WORK_DIR}/SOURCES/certs/${n}
+        cp -a ${WORK_DIR}/cert/kubernetes/${n}/* ${RPM_WORK_DIR}/SOURCES/certs/${n}/
+        tmpnum=$((tmpnum+1))
+    done
+
+    # server bin files
+    [ -d ${RPM_WORK_DIR}/SOURCES/server/bin ] || mkdir -pv ${RPM_WORK_DIR}/SOURCES/server/bin
+    cp -a ${WORK_DIR}/bin/{kube-apiserver,kube-controller-manager,kube-scheduler} ${RPM_WORK_DIR}/SOURCES/server/bin/
+    
+    # server config files
+    [ -d ${RPM_WORK_DIR}/SOURCES/server/etc ] || mkdir -pv ${RPM_WORK_DIR}/SOURCES/server/etc
+    cp -a ${WORK_DIR}/kubernetes/{kube-apiserver,kube-controller-manager,kube-scheduler} ${RPM_WORK_DIR}/SOURCES/server/etc/
+    
+    # server systemd files
+    [ -d ${RPM_WORK_DIR}/SOURCES/server/systemd ] || mkdir -pv ${RPM_WORK_DIR}/SOURCES/server/systemd
+    cp -a ${WORK_DIR}/system/{kube-apiserver.service,kube-controller-manager.service,kube-scheduler.service} ${RPM_WORK_DIR}/SOURCES/server/systemd/
+
+    # client bin files
+    [ -d ${RPM_WORK_DIR}/SOURCES/client/bin ] || mkdir -pv ${RPM_WORK_DIR}/SOURCES/client/bin
+    cp ${WORK_DIR}/bin/{kubelet,kube-proxy} ${RPM_WORK_DIR}/SOURCES/client/bin/
+    
+    # client config files
+    [ -d ${RPM_WORK_DIR}/SOURCES/client/etc ] || mkdir -pv ${RPM_WORK_DIR}/SOURCES/client/etc
+    cp -a ${WORK_DIR}/kubernetes/{kubelet,kubelet-config.yaml,kube-proxy,kube-proxy-config.yaml} ${RPM_WORK_DIR}/SOURCES/client/etc/
+    
+    # client cert files
+    [ -d ${RPM_WORK_DIR}/SOURCES/client/certs ] || mkdir -pv ${RPM_WORK_DIR}/SOURCES/client/certs
+    cp -a ${WORK_DIR}/cert/kubernetes/kubelet/* ${RPM_WORK_DIR}/SOURCES/client/certs/
+    
+    # client systemd files
+    [ -d ${RPM_WORK_DIR}/SOURCES/client/systemd ] || mkdir -pv ${RPM_WORK_DIR}/SOURCES/client/systemd
+    cp -a ${WORK_DIR}/system/{kubelet.service,kube-proxy.service} ${RPM_WORK_DIR}/SOURCES/client/systemd/
+    
+    # bin cli files
+    [ -d ${RPM_WORK_DIR}/SOURCES/cli ] || mkdir -pv ${RPM_WORK_DIR}/SOURCES/cli
+    cp ${WORK_DIR}/bin/kubectl ${RPM_WORK_DIR}/SOURCES/cli/
+
+    # etcd cert files
+    [ -d ${RPM_WORK_DIR}/SOURCES/etcd ] || mkdir -pv ${RPM_WORK_DIR}/SOURCES/etcd
+    cp -a ${WORK_DIR}/cert/etcd/* ${RPM_WORK_DIR}/SOURCES/etcd/
+    
+    cat > ${WORK_DIR}/rpmbuild/SPECS/kubernetes.spec << EOF
+Name: kubernetes
+Version: ${Kubernetes_Version}
+Release: 1%{?dist}
+Summary: kubernetes
+Group: kubernetes
+License: GPL
+
+%package log-collection
+Summary: kubernetes log collection configurtion file.
+Group: Kubernetes/Log
+Vendor: Cylon Chau
+Source0: kubernetes.conf
+URL: https://github.com/cylonChau/kubernetes-generator
+BuildRoot: %{_tmppath}/%{name}-%{version}-buildroot
+
+%package kubectl
+Summary: The commond line interface of kubernetes cluster.
+Group: Kubernetes/Cli
+Vendor: Cylon Chau
+Source1: cli
+URL: https://github.com/cylonChau/kubernetes-generator
+BuildRoot: %{_tmppath}/%{name}-%{version}-buildroot
+
+%package server
+Summary: The binary file of kubernetes control plane.
+Group: Kubernetes/Server
+Vendor:  Cylon Chau
+Source2: server
+URL: https://github.com/cylonChau/kubernetes-generator
+BuildRoot: %{_tmppath}/%{name}-%{version}-buildroot
+
+%package admincfg
+Summary: The administration configration file of kubernetes cluster.
+Group: Kubernetes/Admin
+Vendor: Cylon Chau
+URL: https://github.com/cylonChau/kubernetes-generator
+BuildRoot: %{_tmppath}/%{name}-%{version}-buildroot
+
+%package client
+Summary: The binary file of kubernetes client.
+Group: Kubernetes/Client
+Vendor: Cylon Chau
+Source3: client
+URL: https://github.com/cylonChau/kubernetes-generator
+BuildRoot: %{_tmppath}/%{name}-%{version}-buildroot
+
+%package client-certificates
+Summary: The certificates of kubernetes client.
+Group: Kubernetes/Certificates
+Vendor: Cylon Chau
+URL: https://github.com/cylonChau/kubernetes-generator
+BuildRoot: %{_tmppath}/%{name}-%{version}-buildroot
+
+%package etcd-certificates
+Summary: The certificates of etcd cluster.
+Group:Applications/Certificates
+Vendor: Cylon Chau
+Source4: etcd
+URL: https://github.com/cylonChau/kubernetes-generator
+BuildRoot: %{_tmppath}/%{name}-%{version}-buildroot
+
+%description
+The kubernetes, also known as K8s, is an open source system for managing containerized applications across multiple hosts. It provides basic mechanisms for deployment, maintenance, and scaling of applications.
+
+%description log-collection
+The kubernetes rsyslog config
+
+%description kubectl
+The Kubernetes Command line tool
+
+%description client-certificates
+The certificates of kubernetes client
+
+%description server
+The binary, systemd, configuration files of kubernetes control plane
+
+%description client
+The binary, systemd, configuration files of kubernetes client
+
+%description admincfg
+The administration configration file of kubernetes cluster
+
+%description etcd-certificates
+The certificates of etcd cluster.
+
+%define __arch_install_post %{nil}
+%define __os_install_post %{nil}
+%global debug_package %{nil}
+
+%prep
+id kube || useradd kube -s /sbin/nologin -M
+
+%install
+rm -rf %{buildroot}
+%{__install} -p -D %{SOURCE0} %{buildroot}/etc/rsyslog.d/kubernetes.conf
+%{__install} -p -D %{SOURCE1}/kubectl %{buildroot}/usr/local/bin/kubectl
+
+%{__install} -d %{buildroot}/usr/local/bin/
+%{__install} -d %{buildroot}${CLIENT_BIN_DIR}
+%{__install} -d %{buildroot}${SERVER_BIN_DIR}
+%{__install} -d %{buildroot}/usr/lib/systemd/system/
+%{__install} -d  %{buildroot}/etc/kubernetes/
+
+%{__install} -d  %{buildroot}/etc/etcd/
+
+%{__cp} -a %{SOURCE2}/bin/* %{buildroot}${SERVER_BIN_DIR}
+%{__cp} -a %{SOURCE2}/etc/* %{buildroot}/etc/kubernetes/
+%{__cp} -a %{SOURCE2}/systemd/* %{buildroot}/usr/lib/systemd/system/
+
+%{__cp} -a %{SOURCE3}/bin/* %{buildroot}${CLIENT_BIN_DIR}
+%{__cp} -a %{SOURCE3}/etc/* %{buildroot}/etc/kubernetes/
+%{__cp} -a %{SOURCE3}/systemd/* %{buildroot}/usr/lib/systemd/system/
+
+%{__cp} -a %{SOURCE3}/certs/* %{buildroot}/etc/kubernetes/
+
+%{__cp} -a %{SOURCE4}/* %{buildroot}/etc/etcd/
+
+%files log-collection
+#%defattr(-,root,root,-)
+%attr(0744,root,root) /etc/rsyslog.d/*
+
+%files kubectl
+#%defattr(-,root,root,-)
+%attr(0755,root,root) /usr/local/bin/kubectl
+
+%files client-certificates
+%defattr(-,root,root,-)
+%attr(0755,kube,kube) /etc/kubernetes/pki/ca.crt
+%attr(0755,kube,kube) /etc/kubernetes/pki/kube-proxy.*
+%attr(0755,kube,kube) /etc/kubernetes/auth/*.conf
+
+%files server
+%defattr(-,kube,kube,-)
+%attr(0755,kube,kube) ${SERVER_BIN_DIR}/kube-apiserver
+%attr(0755,kube,kube) ${SERVER_BIN_DIR}/kube-controller-manager
+%attr(0755,kube,kube) ${SERVER_BIN_DIR}/kube-scheduler
+%attr(0644,kube,kube) /etc/kubernetes/kube-apiserver
+%attr(0644,kube,kube) /etc/kubernetes/kube-controller-manager
+%attr(0644,kube,kube) /etc/kubernetes/kube-scheduler
+%attr(0755,root,root) /usr/lib/systemd/system/kube-apiserver.service
+%attr(0755,root,root) /usr/lib/systemd/system/kube-controller-manager.service
+%attr(0755,root,root) /usr/lib/systemd/system/kube-scheduler.service
+
+%files client
+%defattr(-,root,root,-)
+%attr(0755,root,root) ${CLIENT_BIN_DIR}/kubelet
+%attr(0755,root,root) ${CLIENT_BIN_DIR}/kube-proxy
+%attr(0755,root,root) /usr/lib/systemd/system/kube-proxy.service
+%attr(0755,root,root) /usr/lib/systemd/system/kubelet.service
+%attr(0644,root,root) /etc/kubernetes/kubelet
+%attr(0644,root,root) /etc/kubernetes/kubelet-config.yaml
+%attr(0644,root,root) /etc/kubernetes/kube-proxy
+%attr(0644,root,root) /etc/kubernetes/kube-proxy-config.yaml
+
+# %files admincfg
+# %defattr(-,root,root,-)
+# %attr(0755,root,root) /etc/kubernetes/auth/admin.conf
+
+%files etcd-certificates
+%defattr(-,root,root,-)
+%attr(0755,root,root) /etc/etcd/*
+
+%pre server
+id kube || useradd kube -s /sbin/nologin -M
+
+%post log-collection
+echo -e "\033[32m Don't forget exec [systemctl restart rsyslog]. \033[0m"
+
+%post client
+[ -d /var/lib/kubelet ] || mkdir -pv /var/lib/kubelet
+echo -e "\033[32m Don't forget to modify the kubelet and kube-proxy configuration file. \033[0m"
+
+%postun server
+id kube && userdel -r kube
+
+%postun client
+echo -e "\033[32m Automatically clean up working directory [/var/lib/kubelet]. \033[0m"
+[ -d /var/lib/kubelet ] || rm -fr /var/lib/kubelet
+
+%changelog log-collection
+* $(date +"%a %b %d %Y") $(id|awk -F '(' '{print $2}'|awk -F ')' '{print $1}')
+- package k8s-log-collection
+
+%changelog kubectl
+* $(date +"%a %b %d %Y") $(id|awk -F '(' '{print $2}'|awk -F ')' '{print $1}')
+- package kubectl
+
+%changelog client-certificates
+* $(date +"%a %b %d %Y") $(id|awk -F '(' '{print $2}'|awk -F ')' '{print $1}')
+- package client-certificates
+
+%changelog server
+* $(date +"%a %b %d %Y") $(id|awk -F '(' '{print $2}'|awk -F ')' '{print $1}')
+- package server
+
+%changelog client
+* $(date +"%a %b %d %Y") $(id|awk -F '(' '{print $2}'|awk -F ')' '{print $1}')
+- package client
+
+%changelog admincfg
+* $(date +"%a %b %d %Y") $(id|awk -F '(' '{print $2}'|awk -F ')' '{print $1}')
+- package admincfg
+
+%changelog etcd-certificates
+* $(date +"%a %b %d %Y") $(id|awk -F '(' '{print $2}'|awk -F ')' '{print $1}')
+- package etcd-certificates
+EOF
+    which rpmbuild &> /dev/null
+    if [ $? -ne 0 ];then
+        echo -e "\033[41;37mCommond rpmbuild not found.\033[0m" 
+        exit $CommondNotFound
+    fi
+    rpmbuild --define "_topdir ${RPM_WORK_DIR}" -ba ${RPM_WORK_DIR}/SPECS/kubernetes.spec
+    
+    for n in `ls -tr -I pki -I patches -I ingress -I front-proxy -I kubelet ${WORK_DIR}/cert/kubernetes/`;
+    do
+        cat > ${WORK_DIR}/rpmbuild/SPECS/kubernetes.spec << EOF
+Name: kubernetes
+Version: ${Kubernetes_Version}
+Release: 1%{?dist}
+Summary: kubernetes
+Group: kubernetes
+License: GPL
+
+%package server-certificates-${n}
+Summary: The certificates of kubernetes Server.
+Group: Kubernetes/Certificates
+Vendor: Cylon Chau
+Source0: certs
+URL: https://github.com/cylonChau/kubernetes-generator
+BuildRoot: %{_tmppath}/%{name}-%{version}-buildroot
+
+%description
+The kubernetes, also known as K8s, is an open source system for managing containerized applications across multiple hosts. It provides basic mechanisms for deployment, maintenance, and scaling of applications.
+
+%description server-certificates-${n}
+The certificates of kubernetes control plane
+
+%install
+%{__install} -d %{buildroot}/etc/kubernetes/
+%{__cp} -a %{SOURCE0}/${n}/* %{buildroot}/etc/kubernetes/
+
+%files server-certificates-${n}
+%defattr(-,kube,kube,-)
+%attr(0755,kube,kube) /etc/kubernetes/pki/ca.*
+%attr(0755,kube,kube) /etc/kubernetes/pki/apiserver-etcd.*
+%attr(0755,kube,kube) /etc/kubernetes/pki/apiserver.*
+%attr(0755,kube,kube) /etc/kubernetes/pki/kube-controller-manager.*
+%attr(0755,kube,kube) /etc/kubernetes/pki/kube-scheduler.*
+%attr(0755,kube,kube) /etc/kubernetes/pki/sa.*
+%attr(0755,kube,kube) /etc/kubernetes/pki/front-proxy-*
+%attr(0755,kube,kube) /etc/kubernetes/auth/controller-manager.conf
+%attr(0755,kube,kube) /etc/kubernetes/auth/scheduler.conf
+%attr(0755,kube,kube) /etc/kubernetes/token.csv
+
+%pre server-certificates-${n}
+id kube || useradd kube -s /sbin/nologin -M
+
+%postun server-certificates-${n}
+id kube && userdel -r kube
+
+%changelog server-certificates-${n}
+* $(date +"%a %b %d %Y") $(id|awk -F '(' '{print $2}'|awk -F ')' '{print $1}')
+- package server-certificates-${n}
+EOF
+    rpmbuild --define "_topdir ${RPM_WORK_DIR}" -ba ${RPM_WORK_DIR}/SPECS/kubernetes.spec
+    done
+
+    [ -d ${WORK_DIR}/rpms ] || mkdir -pv ${WORK_DIR}/rpms
+    cp ${RPM_WORK_DIR}/RPMS/`uname -i`/*.rpm  ${WORK_DIR}/rpms/
+    rm -fr ${RPM_WORK_DIR}
+}
+
+function CLEAN_WORK_DIR(){
+    if [ ${ISRPM} == "Y" ];then
+        rm -fr ${WORK_DIR}/{kubernetes,rsyslog,system,bin,cert}
+        echo -n -e "\n\033[31mPlease install the files under the [${WORK_DIR}/rpms] path directly. \033[0m\n"
+    else
+        END
+    fi
 }
 
 function MAIN(){
+    set_cert_evn kubernetes
     echo -n -e "generated content\n    1.only certificates for etcd and kubernetes.\n    2.only donwload kubernetes\n    3.certificates and config files.\n"
     read -p "Please enter the which to generate [3]: " INSTALL_OPS
     INSTALL_OPS=${INSTALL_OPS:-3}
 
     case ${INSTALL_OPS} in
     1)
-        set_evn
+        set_env
         DownloadKube
         ExtractKube
         Generate_Certificates
         CleanBin
         ;;
     2)  
-        set_evn
+        set_env
         DownloadKube
         ExtractKube
         ;;
     3)
-        set_evn
+        set_env
         DownloadKube
         ExtractKube
         Generate_Certificates
         ActionInitail
-        END
+        RPM
+        CLEAN_WORK_DIR
         ;;
     *)  
         echo -e "\033[41;37millegal option\033[0m" 

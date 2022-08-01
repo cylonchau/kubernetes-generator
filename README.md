@@ -3,6 +3,11 @@
 
 A simple script to generation of certificates, kubernetes config files, systemd files, etc.  required for binary deployment of kubernetes clusters
 
+### Changed
+
+- Fixed Bug: Malformed path 👍
+- Add Feature: Automatically generate RPM packages 👍
+
 ### Quick Start
 
 #### Prerequisites
