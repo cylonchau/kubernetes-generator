@@ -636,7 +636,6 @@ function InitKubelet(){
     export LET_KUBECONF_DIR=${LET_KUBECONF_DIR:-/etc/kubernetes/auth}
 
     cat > ${CONF_DIR}/${LET_NAME} << EOF
-###
 # kubernetes kubelet config
 #
 # The address for the info server to serve on (set to 0.0.0.0 or "" for all interfaces)
@@ -696,9 +695,8 @@ function InitProxy(){
     export PROXY_LISTEN=${PROXY_LISTEN:-0.0.0.0}
 
     cat > ${CONF_DIR}/${PROXY_NAME} << EOF
-###
 # kubernetes proxy config
-
+#
 # You can add your configuration own!
 KUBE_PROXY_ARGS="--v=0 \\
     --logtostderr=true \\
@@ -785,9 +783,6 @@ function set_env(){
 }
 
 function RPM(){
-    read -p "Please enter the kubernetes version to download [1.18.20]: " Kubernetes_Version
-    export Kubernetes_Version=${Kubernetes_Version:-1.18.20}
-
     read -p "Is it packaged as an RPM? [Y/N default Y]: " ISRPM
     export ISRPM=${ISRPM:-Y}
     if [ ${ISRPM} = "Y" ]; then
@@ -799,7 +794,6 @@ function RPM(){
 
 function RPM_LOGIC(){
     cp ${LOG_CONFIG_DIR}/kubernetes.conf ${RPM_WORK_DIR}/SOURCES/
-    
     # server cert files
     tmpnum=0
     for n in `ls -tr -I pki -I patches -I ingress -I front-proxy -I kubelet ${WORK_DIR}/cert/kubernetes/`;
