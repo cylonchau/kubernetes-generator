@@ -1127,7 +1127,6 @@ function CLEAN_WORK_DIR(){
 }
 
 function MAIN(){
-    set_cert_evn kubernetes
     echo -n -e "generated content\n    1.only certificates for etcd and kubernetes.\n    2.only donwload kubernetes\n    3.certificates and config files.\n"
     read -p "Please enter the which to generate [3]: " INSTALL_OPS
     INSTALL_OPS=${INSTALL_OPS:-3}
