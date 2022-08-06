@@ -622,7 +622,7 @@ function INIT_CLIENT(){
 function InitKubelet(){
     echo -n -e "\nLet's configure some parameters below to prepare to
         generate the \033[41;37mkubelet\033[0m config file.\n\n" 
-    
+
     read -p "Please enter the \"kubelet\" service name [kubelet]: " LET_NAME
     export LET_NAME=${LET_NAME:-kubelet}
 
@@ -631,6 +631,9 @@ function InitKubelet(){
 
     read -p "Please enter port for the kubelet [10250]: " LET_PORT
     export LET_PORT=${LET_PORT:-10250}
+
+    read -p "Please enter the \"kubelet\" working directory [/var/lib/kubelet]: " LET_CONF_DIR
+    export LET_CONF_DIR=${LET_CONF_DIR:-/var/lib/kubelet}
 
     read -p "Please enter kubeconfig path for the kubelet [/etc/kubernetes/auth]: " LET_KUBECONF_DIR
     export LET_KUBECONF_DIR=${LET_KUBECONF_DIR:-/etc/kubernetes/auth}
@@ -663,7 +666,6 @@ After=docker.service
 Requires=docker.service
 
 [Service]
-User=kube
 WorkingDirectory=${LET_CONF_DIR}
 EnvironmentFile=-/etc/kubernetes/${LET_NAME}
 ExecStart=${CLIENT_BIN_DIR}/${LET_NAME} \\
@@ -713,7 +715,6 @@ Documentation=https://github.com/kubernetes
 After=network.target
 
 [Service]
-User=kube
 EnvironmentFile=-/etc/kubernetes/${PROXY_NAME} 
 ExecStart=${CLIENT_BIN_DIR}/${PROXY_NAME} \\
     \$KUBE_MASTER \\
@@ -1013,15 +1014,15 @@ id kube || useradd kube -s /sbin/nologin -M
 echo -e "\033[32m Don't forget exec [systemctl restart rsyslog]. \033[0m"
 
 %post client
-[ -d /var/lib/kubelet ] || mkdir -pv /var/lib/kubelet
-echo -e "\033[32m Don't forget to modify the kubelet and kube-proxy configuration file. \033[0m"
+[ -d ${LET_CONF_DIR} ] || mkdir -pv ${LET_CONF_DIR}
+echo -e "\033[42;37mDon't forget to modify the kubelet and kube-proxy configuration file.\033[0m" 
 
 %postun server
 id kube && userdel -r kube
 
 %postun client
-echo -e "\033[32m Automatically clean up working directory [/var/lib/kubelet]. \033[0m"
-[ -d /var/lib/kubelet ] || rm -fr /var/lib/kubelet
+echo -e "\033[42;37mAutomatically clean up working directory [${LET_CONF_DIR}].\033[0m" 
+[ -d ${LET_CONF_DIR} ] || rm -fr ${LET_CONF_DIR}
 
 %changelog log-collection
 * $(date +"%a %b %d %Y") $(id|awk -F '(' '{print $2}'|awk -F ')' '{print $1}')
