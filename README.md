@@ -1,25 +1,23 @@
 
-## kubernetes-certificates-generator
+## kubernetes-generator
 
-A simple script to generation of certificates, kubernetes config files, systemd files, etc.  required for binary deployment of kubernetes clusters
+A simple script to generation of certificates, kubernetes config files, systemd files and kubernetes binarey file, etc.  required for binary deployment of kubernetes clusters.
 
 ### Changed
 
 - Fixed Bug: Malformed path 👍
-- Add Feature: Automatically generate RPM packages 👍
+- Aug 6, 2022: Add Feature: Automatically generate RPM packages 👍
+- May 31, 2023: Support debian/ubuntu and automatically generate deb package.
 
 ### Quick Start
 
 #### Prerequisites
 
-- Modify  openssl.conf and change it to the ip and domain you need at the bottom. The variable part is the domain name entered when generating the certificate, and the others are other access addresses required by the kubernetes cluster.
-  - openssl.conf
+- If you cluster ip is other, you must edit script, to change `generate_openssl_config_file` function's openssl config setting.
 
 
 ```
-git clone https://github.com/CylonChau/kubernetes-generator && cd kubernetes-generator
-chmod +x generator.sh
-./generator.sh
+bash <(curl -s https://raw.githubusercontent.com/cylonchau/kubernetes-generator/main/generator.sh)
 ```
 
 
