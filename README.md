@@ -7,7 +7,8 @@ A simple script to generation of certificates, kubernetes config files, systemd 
 
 - Fixed Bug: Malformed path 👍
 - Aug 6, 2022: Add Feature: Automatically generate RPM packages 👍
-- May 31, 2023: Support debian/ubuntu and automatically generate deb package.
+- Mar 31, 2023: Support debian/ubuntu and automatically generate deb package.
+- May 26, 2023: Fixed Centos generation RPM package issue.
 
 ### Quick Start
 

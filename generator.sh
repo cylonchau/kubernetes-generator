@@ -19,7 +19,7 @@ APISERVER_CLUSTER_IP=
 MASTER_NAME=
 
 [ ca ]
-# `man ca`
+# man ca
 default_ca = CA_default
 
 [ CA_default ]
@@ -54,7 +54,7 @@ commonName              = supplied
 emailAddress            = optional
 
 [ req ]
-# `man req`
+# man req
 default_bits        = 4096
 distinguished_name  = req_distinguished_name
 string_mask         = utf8only
@@ -68,7 +68,7 @@ localityName                   = Locality Name
 organizationalUnitName         = Organizational Unit Name
 commonName                     = Common Name
 
-# Certificate extensions (`man x509v3_config`)
+# Certificate extensions (man x509v3_config)
 
 [ v3_ca ]
 subjectKeyIdentifier = hash
@@ -1247,7 +1247,7 @@ Summary: kubernetes log collection configurtion file.
 Group: Kubernetes/Log
 Vendor: Cylon Chau
 Source0: kubernetes.conf
-URL: https://Cylon Chau <cylonchau@outlook.com>
+URL: https://cylonchau.github.io
 BuildRoot: %{_tmppath}/%{name}-%{version}-buildroot
 
 %package kubectl
@@ -1255,7 +1255,7 @@ Summary: The commond line interface of kubernetes cluster.
 Group: Kubernetes/Cli
 Vendor: Cylon Chau
 Source1: cli
-URL: https://Cylon Chau <cylonchau@outlook.com>
+URL: https://cylonchau.github.io
 BuildRoot: %{_tmppath}/%{name}-%{version}-buildroot
 
 %package server
@@ -1263,14 +1263,7 @@ Summary: The binary file of kubernetes control plane.
 Group: Kubernetes/Server
 Vendor:  Cylon Chau
 Source2: server
-URL: https://Cylon Chau <cylonchau@outlook.com>
-BuildRoot: %{_tmppath}/%{name}-%{version}-buildroot
-
-%package admincfg
-Summary: The administration configration file of kubernetes cluster.
-Group: Kubernetes/Admin
-Vendor: Cylon Chau
-URL: https://Cylon Chau <cylonchau@outlook.com>
+URL: https://cylonchau.github.io
 BuildRoot: %{_tmppath}/%{name}-%{version}-buildroot
 
 %package client
@@ -1278,14 +1271,14 @@ Summary: The binary file of kubernetes client.
 Group: Kubernetes/Client
 Vendor: Cylon Chau
 Source3: client
-URL: https://Cylon Chau <cylonchau@outlook.com>
+URL: https://cylonchau.github.io
 BuildRoot: %{_tmppath}/%{name}-%{version}-buildroot
 
 %package client-certificates
 Summary: The certificates of kubernetes client.
 Group: Kubernetes/Certificates
 Vendor: Cylon Chau
-URL: https://Cylon Chau <cylonchau@outlook.com>
+URL: https://cylonchau.github.io
 BuildRoot: %{_tmppath}/%{name}-%{version}-buildroot
 
 %package etcd-certificates
@@ -1293,7 +1286,7 @@ Summary: The certificates of etcd cluster.
 Group:Applications/Certificates
 Vendor: Cylon Chau
 Source4: etcd
-URL: https://Cylon Chau <cylonchau@outlook.com>
+URL: https://cylonchau.github.io
 BuildRoot: %{_tmppath}/%{name}-%{version}-buildroot
 
 %description
@@ -1313,9 +1306,6 @@ The binary, systemd, configuration files of kubernetes control plane
 
 %description client
 The binary, systemd, configuration files of kubernetes client
-
-%description admincfg
-The administration configration file of kubernetes cluster
 
 %description etcd-certificates
 The certificates of etcd cluster.
@@ -1389,10 +1379,6 @@ rm -rf %{buildroot}
 %attr(0644,root,root) /etc/kubernetes/kube-proxy
 %attr(0644,root,root) /etc/kubernetes/kube-proxy-config.yaml
 
-# %files admincfg
-# %defattr(-,root,root,-)
-# %attr(0755,root,root) /etc/kubernetes/auth/admin.conf
-
 %files etcd-certificates
 %defattr(-,root,root,-)
 %attr(0755,root,root) /etc/etcd/*
@@ -1442,12 +1428,8 @@ echo -e "\033[42;37mAutomatically clean up working directory [${LET_CONF_DIR}].\
 * $(date +"%a %b %d %Y") $(id|awk -F '(' '{print $2}'|awk -F ')' '{print $1}')
 - package etcd-certificates
 EOF
-    which rpmbuild &> /dev/null
-    if [ $? -ne 0 ];then
-        echo -e "\033[41;37mCommond rpmbuild not found.\033[0m"
-        exit $CommondNotFound
-    fi
-    rpmbuild --define "_topdir ${RPM_WORK_DIR}" -ba ${RPM_WORK_DIR}/SPECS/kubernetes.spec
+    which rpmbuild &> /dev/null || sudo yum install -y rpm-build redhat-rpm-config rpmdevtools
+    rpmbuild --define "_topdir ${RPM_WORK_DIR}" --define="%_unpackaged_files_terminate_build 0" -ba ${RPM_WORK_DIR}/SPECS/kubernetes.spec
 
     for n in `ls -tr -I pki -I patches -I ingress -I front-proxy -I kubelet ${WORK_DIR}/cert/kubernetes/`;
     do
@@ -1464,7 +1446,14 @@ Summary: The certificates of kubernetes Server.
 Group: Kubernetes/Certificates
 Vendor: Cylon Chau
 Source0: certs
-URL: https://Cylon Chau <cylonchau@outlook.com>
+URL: https://cylonchau.github.io
+BuildRoot: %{_tmppath}/%{name}-%{version}-buildroot
+
+%package admincfg-${n}
+Summary: The administration configration file of kubernetes cluster.
+Group: Kubernetes/Admin
+Vendor: Cylon Chau
+URL: https://cylonchau.github.io
 BuildRoot: %{_tmppath}/%{name}-%{version}-buildroot
 
 %description
@@ -1472,6 +1461,9 @@ The kubernetes, also known as K8s, is an open source system for managing contain
 
 %description server-certificates-${n}
 The certificates of kubernetes control plane
+
+%description admincfg-${n}
+The administration configration file of kubernetes cluster
 
 %install
 %{__install} -d %{buildroot}/etc/kubernetes/
@@ -1481,6 +1473,7 @@ The certificates of kubernetes control plane
 %defattr(-,kube,kube,-)
 %attr(0755,kube,kube) /etc/kubernetes/pki/ca.*
 %attr(0755,kube,kube) /etc/kubernetes/pki/apiserver-etcd.*
+%attr(0755,kube,kube) /etc/kubernetes/pki/apiserver-kubelet-client.*
 %attr(0755,kube,kube) /etc/kubernetes/pki/apiserver.*
 %attr(0755,kube,kube) /etc/kubernetes/pki/kube-controller-manager.*
 %attr(0755,kube,kube) /etc/kubernetes/pki/kube-scheduler.*
@@ -1489,6 +1482,10 @@ The certificates of kubernetes control plane
 %attr(0755,kube,kube) /etc/kubernetes/auth/controller-manager.conf
 %attr(0755,kube,kube) /etc/kubernetes/auth/scheduler.conf
 %attr(0755,kube,kube) /etc/kubernetes/token.csv
+
+%files admincfg-${n}
+%defattr(-,kube,kube,-)
+%attr(0755,kube,kube) /etc/kubernetes/auth/admin.conf
 
 %pre server-certificates-${n}
 id kube || useradd kube -s /sbin/nologin -M
@@ -1499,8 +1496,12 @@ id kube && userdel -r kube
 %changelog server-certificates-${n}
 * $(date +"%a %b %d %Y") $(id|awk -F '(' '{print $2}'|awk -F ')' '{print $1}')
 - package server-certificates-${n}
+
+%changelog admincfg-${n}
+* $(date +"%a %b %d %Y") $(id|awk -F '(' '{print $2}'|awk -F ')' '{print $1}')
+- package admincfg-${n}
 EOF
-    rpmbuild --define "_topdir ${RPM_WORK_DIR}" -ba ${RPM_WORK_DIR}/SPECS/kubernetes.spec
+    rpmbuild --define "_topdir ${RPM_WORK_DIR}" --define="%_unpackaged_files_terminate_build 0" -ba ${RPM_WORK_DIR}/SPECS/kubernetes.spec
     done
 
     [ -d ${WORK_DIR}/rpms ] || mkdir -pv ${WORK_DIR}/rpms
