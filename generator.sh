@@ -1289,6 +1289,14 @@ Source4: etcd
 URL: https://cylonchau.github.io
 BuildRoot: %{_tmppath}/%{name}-%{version}-buildroot
 
+%package kube-apiserver-etcd-certificates
+Summary: The certificates of etcd cluster.
+Group: Kubernetes/etcd-client-Certificates
+Vendor: Cylon Chau
+Source5: etcd
+URL: https://cylonchau.github.io
+BuildRoot: %{_tmppath}/%{name}-%{version}-buildroot
+
 %description
 The kubernetes, also known as K8s, is an open source system for managing containerized applications across multiple hosts. It provides basic mechanisms for deployment, maintenance, and scaling of applications.
 
@@ -1309,6 +1317,9 @@ The binary, systemd, configuration files of kubernetes client
 
 %description etcd-certificates
 The certificates of etcd cluster.
+
+%description kube-apiserver-etcd-certificates
+The certificates of kube-apiserver connect to etcd cluster.
 
 %define __arch_install_post %{nil}
 %define __os_install_post %{nil}
@@ -1381,7 +1392,14 @@ rm -rf %{buildroot}
 
 %files etcd-certificates
 %defattr(-,root,root,-)
-%attr(0755,root,root) /etc/etcd/*
+%attr(0755,root,root) /etc/etcd/pki/ca.*
+%attr(0755,root,root) /etc/etcd/pki/client.*
+%attr(0755,root,root) /etc/etcd/pki/peer.*
+%attr(0755,root,root) /etc/etcd/pki/server.*
+
+%files kube-apiserver-etcd-certificates
+%defattr(-,root,root,-)
+%attr(0755,root,root) /etc/etcd/pki/apiserver-etcd.*
 
 %pre server
 id kube || useradd kube -s /sbin/nologin -M
