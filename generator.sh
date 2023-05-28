@@ -24,15 +24,15 @@ default_ca = CA_default
 
 [ CA_default ]
 # Directory and file locations.
-dir               = ${ENV::CERT_DIR}
-certs             = $dir
-crl_dir           = $dir/crl
-new_certs_dir     = $dir
-database          = $dir/index.txt
-serial            = $dir/serial
+dir               = \${ENV::CERT_DIR}
+certs             = \$dir
+crl_dir           = \$dir/crl
+new_certs_dir     = \$dir
+database          = \$dir/index.txt
+serial            = \$dir/serial
 # certificate revocation lists.
-crlnumber         = $dir/crlnumber
-crl               = $dir/crl/intermediate-ca.crl
+crlnumber         = \$dir/crlnumber
+crl               = \$dir/crl/intermediate-ca.crl
 crl_extensions    = crl_ext
 default_crl_days  = 30
 default_md        = sha256
@@ -146,26 +146,29 @@ extendedKeyUsage = clientAuth
 subjectAltName = @master_names
 
 [req_dns]
-DNS.1 = ${ENV::BASE_DOMAIN}
+DNS.1 = \${ENV::BASE_DOMAIN}
 DNS.2 = localhost
 IP.1 = 10.0.0.5
 IP.2 = 127.0.0.1
+IP.3 = 127.0.0.5
 
 [apiserver_names]
-DNS.1 = ${ENV::CLUSTER_NAME}-${ENV::BASE_DOMAIN}
-DNS.2 = ${ENV::BASE_DOMAIN}
+DNS.1 = \${ENV::CLUSTER_NAME}-\${ENV::BASE_DOMAIN}
+DNS.2 = \${ENV::BASE_DOMAIN}
 DNS.3 = kubernetes
 DNS.4 = kubernetes.default
 DNS.5 = kubernetes.default.svc
 DNS.6 = kubernetes.default.svc.cluster.local
-IP.1 = ${ENV::APISERVER_CLUSTER_IP}
+IP.1 = \${ENV::APISERVER_CLUSTER_IP}
 IP.2 = 10.0.0.5
+IP.3 = 10.0.0.4
 
 
 [ master_names ]
-DNS.1 = ${ENV::MASTER_NAME}.${ENV::BASE_DOMAIN}
-DNS.2 = ${ENV::BASE_DOMAIN}
+DNS.1 = \${ENV::MASTER_NAME}.\${ENV::BASE_DOMAIN}
+DNS.2 = \${ENV::BASE_DOMAIN}
 IP.1 = 10.0.0.5
+IP.2 = 10.0.0.4
 
 [ etcd_client ]
 DNS.1 = localhost
@@ -1412,7 +1415,7 @@ echo -e "\033[32m Don't forget exec [systemctl restart rsyslog]. \033[0m"
 echo -e "\033[42;37mDon't forget to modify the kubelet and kube-proxy configuration file.\033[0m"
 
 %postun server
-id kube && userdel -r kube
+id kube &> /dev/null && userdel -r kube
 
 %postun client
 echo -e "\033[42;37mAutomatically clean up working directory [${LET_CONF_DIR}].\033[0m"
@@ -1509,7 +1512,7 @@ The administration configration file of kubernetes cluster
 id kube || useradd kube -s /sbin/nologin -M
 
 %postun server-certificates-${n}
-id kube && userdel -r kube
+id kube &> /dev/null && userdel -r kube
 
 %changelog server-certificates-${n}
 * $(date +"%a %b %d %Y") $(id|awk -F '(' '{print $2}'|awk -F ')' '{print $1}')
