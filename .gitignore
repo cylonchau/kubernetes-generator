@@ -16,4 +16,5 @@
 
 _output/*
 _output
+openssl.conf
 .idea
