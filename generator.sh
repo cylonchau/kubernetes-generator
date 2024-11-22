@@ -113,7 +113,7 @@ subjectKeyIdentifier = hash
 authorityKeyIdentifier = keyid,issuer:always
 keyUsage = critical, digitalSignature, keyEncipherment
 extendedKeyUsage = serverAuth, clientAuth
-subjectAltName = @req_dns
+subjectAltName = @etcd_server_and_peer_dns
 
 [ etcd_peer_cert ]
 basicConstraints = CA:FALSE
@@ -123,7 +123,7 @@ subjectKeyIdentifier = hash
 authorityKeyIdentifier = keyid,issuer:always
 keyUsage = critical, digitalSignature, keyEncipherment
 extendedKeyUsage = serverAuth, clientAuth
-subjectAltName = @req_dns
+subjectAltName = @etcd_server_and_peer_dns
 
 [ apiserver_cert ]
 basicConstraints = CA:FALSE
@@ -143,9 +143,10 @@ subjectKeyIdentifier = hash
 authorityKeyIdentifier = keyid,issuer
 keyUsage = critical, nonRepudiation, digitalSignature, keyEncipherment
 extendedKeyUsage = clientAuth
-subjectAltName = @master_names
+subjectAltName = @master_component_names
 
-[req_dns]
+
+[etcd_server_and_peer_dns]
 DNS.1 = \${ENV::BASE_DOMAIN}
 DNS.2 = localhost
 IP.1 = 10.0.0.5
@@ -164,12 +165,13 @@ IP.2 = 10.0.0.5
 IP.3 = 10.0.0.4
 
 
-[ master_names ]
+[ master_component_names ]
 DNS.1 = \${ENV::MASTER_NAME}.\${ENV::BASE_DOMAIN}
 DNS.2 = \${ENV::BASE_DOMAIN}
 IP.1 = 10.0.0.5
 IP.2 = 10.0.0.4
 
+# used for etcd_client
 [ etcd_client ]
 DNS.1 = localhost
 IP.1 = 10.0.0.5
@@ -479,44 +481,59 @@ function generate_certificates(){
 ######################################################################################
 #                download and extract kubernetes bin file.                           #
 ######################################################################################
-
-function download_kube(){
-    read -p "Please enter the kubernetes version to download [1.18.20]: " Kubernetes_Version
+function set_kube_version(){
+    read -p "Please enter the Kubernetes version to download [1.18.20]: " Kubernetes_Version
     export Kubernetes_Version=${Kubernetes_Version:-1.18.20}
 
     export build_arch=""
     case "`uname -m`" in
-    x86*)
+    x86* )
         build_arch="amd64"
         ;;
-    *arm*)
+    *arm* )
         build_arch="arm64"
-        ;;
-
-    esac
-
-    export KubernetesDownloadUrl="https://dl.k8s.io/v${Kubernetes_Version}/kubernetes-server-linux-${build_arch}.tar.gz"
-    code=$(curl -L -I -w %{http_code} ${KubernetesDownloadUrl} -o /dev/null -s)
-
-    export TMP_DIR=${WORK_DIR}/tmp
-    [ -d ${TMP_DIR} ] && rm -fr ${TMP_DIR}
-    mkdir -p ${TMP_DIR}
-    case "$code" in
-    404|"404")
-        echo -n -e "Kubernetes version v${Kubernetes_Version} Not Found.\n"
-        exit ${NotFount}
-        ;;
-    *)
-        echo -n -e "\n\033[41;37mBegin download kubernetes v${Kubernetes_Version}.\033[0m\n\n"
-        wget -t 3 -P ${TMP_DIR} ${KubernetesDownloadUrl}
         ;;
     esac
 }
 
+function download_kube(){
+    set_kube_version
+
+    export KubernetesDownloadUrl="https://dl.k8s.io/v${Kubernetes_Version}/kubernetes-server-linux-${build_arch}.tar.gz"
+
+    # Check if TMP_DIR exists and create if not
+    export TMP_DIR=/tmp/${Kubernetes_Version}
+    [ ! -d ${TMP_DIR} ] || mkdir -p ${TMP_DIR}
+    local kube_file="${TMP_DIR}/kubernetes-server-linux-${build_arch}.tar.gz"
+
+    # Check if the Kubernetes file already exists
+    if [ -f "$kube_file" ]; then
+        echo -n -e "\033[42;37mKubernetes v${Kubernetes_Version} already exists. Skipping download.\033[0m\n"
+    else
+        # Check if the download URL is valid
+        code=$(curl -L -I -w %{http_code} ${KubernetesDownloadUrl} -o /dev/null -s)
+        
+        case "$code" in
+        404)
+            echo -n -e "Kubernetes version v${Kubernetes_Version} not found.\n"
+            exit 1
+            ;;
+        *)
+            echo -n -e "\n\033[41;37mStarting download for Kubernetes v${Kubernetes_Version}.\033[0m\n\n"
+            wget -t 3 -P ${TMP_DIR} ${KubernetesDownloadUrl}
+            if [ $? -ne 0 ]; then
+                echo "Download failed!"
+                exit 1
+            fi
+            ;;
+        esac
+    fi
+}
+
+
 function extract_kube(){
     export ExtratDir=${TMP_DIR}/kubernetes/server/bin/
     tar xf ${TMP_DIR}/kubernetes-server-linux-amd64.tar.gz -C ${TMP_DIR}/
-    rm -f ${TMP_DIR}/kubernetes-server-linux-amd64.tar.gz
 
     find ${TMP_DIR}/kubernetes/server/bin/ -type f \
     ! -name "kube-apiserver" \
@@ -529,6 +546,10 @@ function extract_kube(){
     -exec rm {} +
 
     mv ${TMP_DIR}/kubernetes/server/bin ${WORK_DIR}/
+}
+
+function clean_download_dir() {
+    set_kube_version
     rm -fr ${TMP_DIR}
 }
 
@@ -1592,7 +1613,7 @@ function clean_work_dir(){
 ######################################################################################
 
 function MAIN(){
-    echo -n -e "generated content\n    1.only certificates for etcd and kubernetes.\n    2.only donwload kubernetes\n    3.certificates and config files.\n"
+    echo -n -e "generated content\n    1.only certificates for etcd and kubernetes.\n    2.only donwload kubernetes\n    3.certificates and config files.\n    4.clean download file.\n"
     read -p "Please enter the which to generate [3]: " INSTALL_OPS
     INSTALL_OPS=${INSTALL_OPS:-3}
 
@@ -1620,6 +1641,9 @@ function MAIN(){
         action_initial
         build_package
         clean_work_dir
+        ;;
+    4)
+        clean_download_dir
         ;;
     *)
         echo -e "\033[41;37millegal option\033[0m"
