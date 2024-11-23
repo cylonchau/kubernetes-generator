@@ -223,9 +223,10 @@ IP.4 = 10.0.0.6
 [ master_component_names ]
 DNS.1 = \${ENV::K8S_MASTER_NAME}.\${ENV::BASE_DOMAIN}
 DNS.2 = \${ENV::BASE_DOMAIN}
-IP.1 = 10.0.0.4
-IP.2 = 10.0.0.5
-IP.3 = 10.0.0.6
+IP.1 = 127.0.0.1
+IP.2 = 10.0.0.4
+IP.3 = 10.0.0.5
+IP.4 = 10.0.0.6
 
 # used for etcd_client
 [ etcd_client ]
@@ -456,7 +457,7 @@ function generate_kubernetes_certificates() {
         kubeconfig_approve ${CLUSTER_NAME} system:kube-controller-manager kube-controller-manager.conf kube-controller-manager.crt kube-controller-manager.key
 
         # echo "Generating kubeconfig for kube-scheduler"
-        kubeconfig_approve ${CLUSTER_NAME} system:kube-scheduler scheduler.conf kube-scheduler.crt kube-scheduler.key
+        kubeconfig_approve ${CLUSTER_NAME} system:kube-scheduler kube-scheduler.conf kube-scheduler.crt kube-scheduler.key
 
         # echo "Generating kubeconfig for Cluster Admin"
         kubeconfig_approve ${CLUSTER_NAME} k8s-admin admin.conf apiserver-kubelet-client.crt apiserver-kubelet-client.key
@@ -842,7 +843,7 @@ function init_kube_scheduler(){
 # You can add your configurtion own!
 KUBE_SCHEDULER_ARGS="--v=0 \\
     --logtostderr=true \\
-    --kubeconfig=/etc/kubernetes/auth/scheduler.conf"
+    --kubeconfig=/etc/kubernetes/auth/kube-scheduler.conf"
 EOF
 
     cat > ${SYSTEMD_DIR}/${KUBE_SCHEDR_NAME}.service << EOF
@@ -1186,14 +1187,14 @@ chown kube:kube -R /etc/kubernetes
 EOF
 
         chmod +x ${KUBE_NODE_BUILD_DIR}/DEBIAN/{preinst,postinst}
-        
+
         DEB_SERVER_CERT_DIR=${KUBE_SERVER_CERT_BUILD_DIR}/${TOKEN_PATH}
         install -d ${DEB_SERVER_CERT_DIR}
         cp -a ${WORK_DIR}/cert/kubernetes/${master}/pki ${KUBE_SERVER_CERT_BUILD_DIR}/${CA_PATH}
         cp -a ${WORK_DIR}/cert/kubernetes/${master}/token.csv ${DEB_SERVER_CERT_DIR}/
 
         install -d ${DEB_SERVER_CERT_DIR}/auth
-        cp -a ${WORK_DIR}/cert/kubernetes/${master}/auth/{kube-controller-manager.conf,scheduler.conf} ${DEB_SERVER_CERT_DIR}/auth/
+        cp -a ${WORK_DIR}/cert/kubernetes/${master}/auth/{kube-controller-manager.conf,kube-scheduler.conf} ${DEB_SERVER_CERT_DIR}/auth/
     
 
         #############################################################
@@ -1632,7 +1633,7 @@ The administration configration file of kubernetes cluster
 %attr(0755,kube,kube) /etc/kubernetes/pki/sa.*
 %attr(0755,kube,kube) /etc/kubernetes/pki/front-proxy-*
 %attr(0755,kube,kube) /etc/kubernetes/auth/kube-controller-manager.conf
-%attr(0755,kube,kube) /etc/kubernetes/auth/scheduler.conf
+%attr(0755,kube,kube) /etc/kubernetes/auth/kube-scheduler.conf
 %attr(0755,kube,kube) /etc/kubernetes/token.csv
 
 %files admincfg-${n}
