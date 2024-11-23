@@ -279,7 +279,7 @@ function cert_kubernetes(){
         echo "Generating CA key and self signed cert."
         openssl genrsa -out $CERT_DIR/ca.key 2048
         openssl req -config openssl.conf \
-            -new -x509 -days 1 -sha256 \
+            -new -x509 -days ${EXPIRED_DAYS} -sha256 \
             -key $CERT_DIR/ca.key -out $CERT_DIR/ca.crt \
         -subj "/CN=${CERT_CN}"
     fi
@@ -1633,7 +1633,7 @@ The administration configration file of kubernetes cluster
 %attr(0755,kube,kube) /etc/kubernetes/pki/sa.*
 %attr(0755,kube,kube) /etc/kubernetes/pki/front-proxy-*
 %attr(0755,kube,kube) /etc/kubernetes/auth/kube-controller-manager.conf
-%attr(0755,kube,kube) /etc/kubernetes/auth/kube-scheduler.conf
+%attr(0755,kube,kube) /etc/kubernetes/auth/scheduler.conf
 %attr(0755,kube,kube) /etc/kubernetes/token.csv
 
 %files admincfg-${n}
