@@ -167,7 +167,7 @@ keyUsage = critical, nonRepudiation, digitalSignature, keyEncipherment
 extendedKeyUsage = clientAuth, serverAuth
 subjectAltName = @etcd_client
 
-[ kube_client_cert ]
+[ kube_node_cert ]
 basicConstraints = CA:FALSE
 nsCertType = client
 nsComment = "OpenSSL Generated Client Certificate"
@@ -175,7 +175,7 @@ subjectKeyIdentifier = hash
 authorityKeyIdentifier = keyid,issuer
 keyUsage = critical, nonRepudiation, digitalSignature, keyEncipherment
 extendedKeyUsage = clientAuth, serverAuth
-subjectAltName = @kube_client
+subjectAltName = @kube_node
 
 [ apiserver_cert ]
 basicConstraints = CA:FALSE
@@ -198,14 +198,16 @@ extendedKeyUsage = clientAuth
 subjectAltName = @master_component_names
 
 
-[etcd_server_and_peer_dns]
+[ etcd_server_and_peer_dns ]
 DNS.1 = \${ENV::BASE_DOMAIN}
 DNS.2 = localhost
-IP.1 = 10.0.0.5
-IP.2 = 127.0.0.1
-IP.3 = 127.0.0.5
+IP.1 = 127.0.0.1
+IP.2 = 127.0.0.5
+IP.3 = 10.0.0.3
+IP.4 = 10.0.0.4
+IP.5 = 10.0.0.5
 
-[apiserver_names]
+[ apiserver_names ]
 DNS.1 = \${ENV::CLUSTER_NAME}-\${ENV::BASE_DOMAIN}
 DNS.2 = \${ENV::BASE_DOMAIN}
 DNS.3 = kubernetes
@@ -213,26 +215,28 @@ DNS.4 = kubernetes.default
 DNS.5 = kubernetes.default.svc
 DNS.6 = kubernetes.default.svc.cluster.local
 IP.1 = \${ENV::KUBEAPISERVER_CLUSTER_IP}
-IP.2 = 10.0.0.5
-IP.3 = 10.0.0.4
+IP.2 = 10.0.0.4
+IP.3 = 10.0.0.5
+IP.4 = 10.0.0.6
 
 
 [ master_component_names ]
 DNS.1 = \${ENV::K8S_MASTER_NAME}.\${ENV::BASE_DOMAIN}
 DNS.2 = \${ENV::BASE_DOMAIN}
-IP.1 = 10.0.0.5
-IP.2 = 10.0.0.4
+IP.1 = 10.0.0.4
+IP.2 = 10.0.0.5
+IP.3 = 10.0.0.6
 
 # used for etcd_client
 [ etcd_client ]
 DNS.1 = localhost
-IP.1 = 10.0.0.5
-IP.2 = 10.0.0.4
-IP.3 = 10.0.0.6
-IP.4 = 127.0.0.1
+IP.1 = 127.0.0.1
+IP.2 = 10.0.0.5
+IP.3 = 10.0.0.4
+IP.4 = 10.0.0.6
 
 # used for kubelet kube-proxy
-[ kube_client ]
+[ kube_node ]
 DNS.1 = \${ENV::CLUSTER_NAME}-\${ENV::BASE_DOMAIN}
 DNS.2 = \${ENV::BASE_DOMAIN}
 IP.1 = \${ENV::KUBEAPISERVER_CLUSTER_IP}
@@ -260,7 +264,7 @@ function cert_kubernetes(){
     read -p "Pls Enter CA Common Name [k8s-ca]: " CERT_CN
     CERT_CN=${CERT_CN:-k8s-ca}
 
-    read -p "Pls Enter Certificate validity period [3650]: " EXPIRED_DAYS
+    read -p "Pls Enter k8s cert validity period [3650]: " EXPIRED_DAYS
     EXPIRED_DAYS=${EXPIRED_DAYS:-3650}
 
     export BASE_DOMAIN CLUSTER_NAME KUBEAPISERVER_CLUSTER_IP MASTERS CERT_CN EXPIRED_DAYS KUBECONFIG_SERVER_IP
@@ -274,7 +278,7 @@ function cert_kubernetes(){
         echo "Generating CA key and self signed cert."
         openssl genrsa -out $CERT_DIR/ca.key 2048
         openssl req -config openssl.conf \
-            -new -x509 -days ${EXPIRED_DAYS} -sha256 \
+            -new -x509 -days 1 -sha256 \
             -key $CERT_DIR/ca.key -out $CERT_DIR/ca.crt \
         -subj "/CN=${CERT_CN}"
     fi
@@ -291,7 +295,7 @@ function cert_etcd(){
     read -p "Pls Enter CA Common Name [etcd-ca]: " CERT_CN
     CERT_CN=${CERT_CN:-etcd-ca}
 
-    read -p "Pls Enter Certificate validity period [3650]: " EXPIRED_DAYS
+    read -p "Pls Enter etcd cert validity period [3650]: " EXPIRED_DAYS
     EXPIRED_DAYS=${EXPIRED_DAYS:-3650}
 
     export BASE_DOMAIN CERT_O CERT_CN EXPIRED_DAYS
@@ -397,7 +401,7 @@ function generate_kubernetes_certificates() {
 
         openssl_req ${front_proxy_dir} front-proxy-client "/CN=front-proxy-client"
 
-        openssl_sign ${front_proxy_dir}/front-proxy-ca.crt ${front_proxy_dir}/front-proxy-ca.key ${front_proxy_dir} front-proxy-client kube_client_cert
+        openssl_sign ${front_proxy_dir}/front-proxy-ca.crt ${front_proxy_dir}/front-proxy-ca.key ${front_proxy_dir} front-proxy-client kube_node_cert
         rm -f ${front_proxy_dir}/*.csr
     fi
 
@@ -423,7 +427,7 @@ function generate_kubernetes_certificates() {
         openssl_sign $CA_CERT $CA_KEY "${master_dir}/pki" kube-apiserver apiserver_cert
         openssl_sign $CA_CERT $CA_KEY "${master_dir}/pki" kube-controller-manager master_component_client_cert
         openssl_sign $CA_CERT $CA_KEY "${master_dir}/pki" kube-scheduler master_component_client_cert
-        openssl_sign $CA_CERT $CA_KEY "${master_dir}/pki" apiserver-kubelet-client kube_client_cert
+        openssl_sign $CA_CERT $CA_KEY "${master_dir}/pki" apiserver-kubelet-client kube_node_cert
         rm -f ${master_dir}/pki/*.csr
 
         # Copy CA key and cert file to ${master_dir}
@@ -463,7 +467,7 @@ function generate_kubernetes_certificates() {
     mkdir -p ${KUBELET_DIR}/{pki,auth}
 
     openssl_req ${KUBELET_DIR}/pki kube-proxy "/CN=system:kube-proxy"
-    openssl_sign $CA_CERT $CA_KEY ${KUBELET_DIR}/pki kube-proxy kube_client_cert
+    openssl_sign $CA_CERT $CA_KEY ${KUBELET_DIR}/pki kube-proxy kube_node_cert
 
     rm -f ${KUBELET_DIR}/pki/kube-proxy.csr
 
@@ -567,7 +571,7 @@ function download_kube(){
 
     # Check if the Kubernetes file already exists
     if [ -f "$kube_file" ]; then
-        bold "Kubernetes v${KUBERNETES_VERSION} already exists. Skipping download."
+        warn "Kubernetes v${KUBERNETES_VERSION} already exists. Skipping download."
     else
         # Check if the download URL is valid
         code=$(curl -L -I -w %{http_code} ${K8S_DOWNLOAD_URL} -o /dev/null -s)
@@ -578,10 +582,10 @@ function download_kube(){
             exit 1
             ;;
         *)
-            bold "Starting download for Kubernetes v${KUBERNETES_VERSION}."
+            note "Download for Kubernetes v${KUBERNETES_VERSION} is begnning."
             wget -t 3 -P ${TMP_DIR} ${K8S_DOWNLOAD_URL}
             if [ $? -ne 0 ]; then
-                echo "Download failed!"
+                error "Download failed!"
                 exit 1
             fi
             ;;
@@ -591,6 +595,7 @@ function download_kube(){
 
 
 function extract_kube(){
+    h2 "Unzipping kubernetes bin package."
     export ExtratDir=${TMP_DIR}/kubernetes/server/bin/
     tar xf ${TMP_DIR}/kubernetes-server-linux-amd64.tar.gz -C ${TMP_DIR}/
 
@@ -623,8 +628,7 @@ function clean_bin(){
 }
 
 function action_initial(){
-    h2 "Let's configure some parameters below to prepare the initial kubernetes config file and systemd file."
-
+    h1 "Let's configure some parameters below to prepare the initial kubernetes config file and systemd file."
     echo -n -e "    1.master.\n    2.node\n    3.all(master and node).\n"
     read -p "Please enter the which to install [3]: " ROLE_PACKAGE
     export ROLE_PACKAGE=${ROLE_PACKAGE:-3}
@@ -651,7 +655,7 @@ function action_initial(){
 }
 
 function init_kube_server(){
-    echo -e "\n"
+    h1 "Generating k8s master configuration is beginning..."
     read -p "Please enter the binary file path of server [/usr/local/bin]: " KUBE_SERVER_BIN_DIR
     export KUBE_SERVER_BIN_DIR=${KUBE_SERVER_BIN_DIR:-/usr/local/bin}
     init_kube_apiserver
@@ -665,13 +669,13 @@ function init_kube_server(){
 
 
 function init_kube_apiserver(){
-   h2 "Let's configure some parameters below to prepare to generate the kube-apiserver config file."
+    h2 "Let's configure some parameters below to prepare to generate the kube-apiserver config file."
 
     read -p "Please enter the \"kube-apiserver\" service name [kube-apiserver]: " KUBE_APISERVER_NAME
     export KUBE_APISERVER_NAME=${KUBE_APISERVER_NAME:-kube-apiserver}
 
-    read -p "Please enter cluster IP range [10.96.0.0/12]: " SVC_IP_RANGE
-    export SVC_IP_RANGE=${SVC_IP_RANGE:-10.96.0.0/12}
+    read -p "Please enter cluster IP range [10.96.0.0/22]: " SVC_IP_RANGE
+    export SVC_IP_RANGE=${SVC_IP_RANGE:-10.96.0.0/22}
 
     read -p "Please enter cluster cetaficate file path [/etc/kubernetes/pki]: " CA_PATH
     export CA_PATH=${CA_PATH:-/etc/kubernetes/pki}
@@ -765,8 +769,7 @@ EOF
 }
 
 function init_kube_controller_manager(){
-    h2 "Let's configure some parameters below to prepare to
-        generate the kube-controller-manager config file."
+    h2 "Let's configure some parameters below to prepare to generate the \"kube-controller-manager\" config file."
 
     read -p "Please enter cluster IP cidr [10.244.0.0/16]: " CM_CLUSTER_CIDR
     export CM_CLUSTER_CIDR=${CM_CLUSTER_CIDR:-10.244.0.0/16}
@@ -826,8 +829,7 @@ EOF
 
 
 function init_kube_scheduler(){
-   h2 "Let's configure some parameters below to prepare to
-        generate the kube-scheduler config file."
+   h2 "Let's configure some parameters below to prepare to generate the \"kube-scheduler\" config file."
 
     read -p "Please enter the \"kube-scheduler\" service name [kube-scheduler]: " KUBE_SCHEDR_NAME
     export KUBE_SCHEDR_NAME=${KUBE_SCHEDR_NAME:-kube-scheduler}
@@ -874,7 +876,8 @@ EOF
 
 
 function init_client(){
-    echo -e "\n"
+    h1 "Generating k8s node configuration is beginning..."
+    
     read -p "Please enter the binary file path of node [/usr/local/bin]: " KUBE_WORKER_BIN_DIR
     export KUBE_WORKER_BIN_DIR=${KUBE_WORKER_BIN_DIR:-/usr/local/bin}
     init_kubelet
@@ -1614,6 +1617,7 @@ EOF
 
 
 function build_package(){
+    h1 "Generating linux package is beginning..."
     case ${LinuxRelease} in
     "CentOS"|"Redhat")
         read -p "Is it packaged as an RPM? [Y/N default Y]: " ISRPM
