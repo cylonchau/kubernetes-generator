@@ -1140,6 +1140,7 @@ EOF
 #!/bin/bash
 chown root:root -R ${LINUX_CONFIG_DIR}
 chmod 555 ${KUBE_SERVER_BIN_DIR}/{kubelet,kube-proxy}
+chown kube:kube /var/lib/kubelet
 EOF
 
     chmod +x ${KUBE_NODE_BUILD_DIR}/DEBIAN/{preinst,postinst}
