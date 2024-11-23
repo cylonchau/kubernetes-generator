@@ -735,8 +735,8 @@ KUBE_API_ARGS="--allow-privileged=${ALLOW_PRIVILEGED} \\
     --requestheader-group-headers=X-Remote-Group \\
     --requestheader-username-headers=X-Remote-User \\
     --service-account-key-file=${CA_PATH}/sa.pub \\
-    --tls-cert-file=${CA_PATH}/apiserver.crt \\
-    --tls-private-key-file=${CA_PATH}/apiserver.key \\
+    --tls-cert-file=${CA_PATH}/kube-apiserver.crt \\
+    --tls-private-key-file=${CA_PATH}/kube-apiserver.key \\
     --token-auth-file=${TOKEN_PATH}/token.csv"
 EOF
     cat > ${SYSTEMD_DIR}/${KUBE_APISERVER_NAME}.service << EOF
@@ -1086,19 +1086,31 @@ Maintainer: Cylon Chau <cylonchau@outlook.com>
 Section: comm
 Homepage: https://kubernetes.io
 EOF
+    cat > ${KUBE_NODE_BUILD_DIR}/DEBIAN/preinst << EOF
+#!/bin/bash
+id kube || useradd kube -s /sbin/nologin -M
+EOF
 
+    cat > ${KUBE_NODE_BUILD_DIR}/DEBIAN/postinst << EOF
+#!/bin/bash
+chown kube:kube -R ${LINUX_CONFIG_DIR}
+chmod 555 ${KUBE_SERVER_BIN_DIR}/{kube-apiserver,kube-controller-manager,kube-scheduler}
+EOF
+
+    chmod +x ${KUBE_NODE_BUILD_DIR}/DEBIAN/{preinst,postinst}
     # server bin files
     DEB_KUBE_SERVER_BIN_DIR=${KUBE_SERVER_BUILD_DIR}/${KUBE_SERVER_BIN_DIR}
     install -d ${DEB_KUBE_SERVER_BIN_DIR}
     cp -a ${WORK_DIR}/bin/{kube-apiserver,kube-controller-manager,kube-scheduler} ${DEB_KUBE_SERVER_BIN_DIR}
 
     # server config files
-    DEB_SERVER_CONFIG_DIR=${KUBE_SERVER_BUILD_DIR}/etc/kubernetes/
+    LINUX_CONFIG_DIR=/etc/kubernetes/
+    DEB_SERVER_CONFIG_DIR=${KUBE_SERVER_BUILD_DIR}${LINUX_CONFIG_DIR}
     install -d ${DEB_SERVER_CONFIG_DIR}
     cp -a ${WORK_DIR}/kubernetes/{kube-apiserver,kube-controller-manager,kube-scheduler} ${DEB_SERVER_CONFIG_DIR}
 
     # server systemd files
-    DEB_SERVER_SYSTEMD_DIR=${KUBE_SERVER_BUILD_DIR}/usr/lib/system/systemd/
+    DEB_SERVER_SYSTEMD_DIR=${KUBE_SERVER_BUILD_DIR}/lib/systemd/system/
     install -d ${DEB_SERVER_SYSTEMD_DIR}
     cp -a ${WORK_DIR}/system/{kube-apiserver.service,kube-controller-manager.service,kube-scheduler.service} ${DEB_SERVER_SYSTEMD_DIR}
 
@@ -1117,7 +1129,19 @@ Maintainer: Cylon Chau <cylonchau@outlook.com>
 Section: comm
 Homepage: https://kubernetes.io
 EOF
-    
+
+    cat > ${KUBE_NODE_BUILD_DIR}/DEBIAN/preinst << EOF
+#!/bin/bash
+id kube || useradd kube -s /sbin/nologin -M
+EOF
+
+    cat > ${KUBE_NODE_BUILD_DIR}/DEBIAN/postinst << EOF
+#!/bin/bash
+chown root:root -R ${LINUX_CONFIG_DIR}
+chmod 555 ${KUBE_SERVER_BIN_DIR}/{kubelet,kube-proxy}
+EOF
+
+    chmod +x ${KUBE_NODE_BUILD_DIR}/DEBIAN/{preinst,postinst}
     # worker bin files
     DEB_WORKER_BIN_DIR=${KUBE_NODE_BUILD_DIR}/${KUBE_WORKER_BIN_DIR}
     install -d ${DEB_WORKER_BIN_DIR}
@@ -1129,7 +1153,7 @@ EOF
     cp -a ${WORK_DIR}/kubernetes/{kubelet,kubelet-config.yaml,kube-proxy,kube-proxy-config.yaml} ${DEB_WORKER_CONFIG_DIR}
 
     # worker systemd files
-    DEB_WORKER_SYSTEMD_DIR=${KUBE_NODE_BUILD_DIR}/usr/lib/system/systemd/
+    DEB_WORKER_SYSTEMD_DIR=${KUBE_NODE_BUILD_DIR}/lib/systemd/system/
     install -d ${DEB_WORKER_SYSTEMD_DIR}
     cp -a ${WORK_DIR}/system/{kubelet.service,kube-proxy.service} ${DEB_WORKER_SYSTEMD_DIR}
     install -d ${KUBE_NODE_BUILD_DIR}/var/lib/kubelet
@@ -1151,6 +1175,18 @@ Maintainer: Cylon Chau <cylonchau@outlook.com>
 Section: comm
 Homepage: https://kubernetes.io
 EOF
+        cat > ${KUBE_NODE_BUILD_DIR}/DEBIAN/preinst << EOF
+#!/bin/bash
+id kube || useradd kube -s /sbin/nologin -M
+EOF
+
+        cat > ${KUBE_NODE_BUILD_DIR}/DEBIAN/postinst << EOF
+#!/bin/bash
+chown kube:kube -R /etc/kubernetes
+EOF
+
+        chmod +x ${KUBE_NODE_BUILD_DIR}/DEBIAN/{preinst,postinst}
+        
         DEB_SERVER_CERT_DIR=${KUBE_SERVER_CERT_BUILD_DIR}/${TOKEN_PATH}
         install -d ${DEB_SERVER_CERT_DIR}
         cp -a ${WORK_DIR}/cert/kubernetes/${master}/pki ${KUBE_SERVER_CERT_BUILD_DIR}/${CA_PATH}
@@ -1195,6 +1231,17 @@ Maintainer: Cylon Chau <cylonchau@outlook.com>
 Section: comm
 Homepage: https://kubernetes.io
 EOF
+    cat > ${KUBE_NODE_BUILD_DIR}/DEBIAN/preinst << EOF
+#!/bin/bash
+id kube || useradd kube -s /sbin/nologin -M
+EOF
+
+    cat > ${KUBE_NODE_BUILD_DIR}/DEBIAN/postinst << EOF
+#!/bin/bash
+chown kube:kube -R /etc/kubernetes
+EOF
+
+    chmod +x ${KUBE_NODE_BUILD_DIR}/DEBIAN/{preinst,postinst}
 
     DEB_WORKER_CERT_DIR=${KUBE_NODE_CERT_BUILD_DIR}/etc/kubernetes
     install -d ${DEB_WORKER_CERT_DIR}
@@ -1218,6 +1265,7 @@ Maintainer: Cylon Chau <cylonchau@outlook.com>
 Section: comm
 Homepage: https://kubernetes.io
 EOF
+
     # etcd certs
     install -d ${ETCD_CERT_BUILD_DIR}/etc/etcd
     cp -a ${WORK_DIR}/cert/etcd/pki ${ETCD_CERT_BUILD_DIR}/etc/etcd/
@@ -1239,7 +1287,6 @@ Maintainer: Cylon Chau <cylonchau@outlook.com>
 Section: comm
 Homepage: https://kubernetes.io
 EOF
-
     # kubernetes syslog format
     install -d ${KUBE_LOG_BUILD_DIR}/etc/rsyslog.d/
     cp -a ${WORK_DIR}/rsyslog/kubernetes.conf ${KUBE_LOG_BUILD_DIR}/etc/rsyslog.d/
@@ -1579,7 +1626,7 @@ The administration configration file of kubernetes cluster
 %attr(0755,kube,kube) /etc/kubernetes/pki/ca.*
 %attr(0755,kube,kube) /etc/kubernetes/pki/apiserver-etcd.*
 %attr(0755,kube,kube) /etc/kubernetes/pki/apiserver-kubelet-client.*
-%attr(0755,kube,kube) /etc/kubernetes/pki/apiserver.*
+%attr(0755,kube,kube) /etc/kubernetes/pki/kube-apiserver.*
 %attr(0755,kube,kube) /etc/kubernetes/pki/kube-controller-manager.*
 %attr(0755,kube,kube) /etc/kubernetes/pki/kube-scheduler.*
 %attr(0755,kube,kube) /etc/kubernetes/pki/sa.*
